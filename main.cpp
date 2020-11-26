@@ -19,8 +19,8 @@ DallasTemperature sensors(&oneWire);
 #include <LiquidCrystal_PCF8574.h>
 #include <Wire.h>
 LiquidCrystal_PCF8574 lcd(0x27); // Set the I2C LCD address
-//------------------------------------------------------------------------------------------
 volatile static bool lcd_update = true;
+//------------------------------------------------------------------------------------------
 void setup_lcd()
 {
     Wire.begin();
@@ -46,16 +46,14 @@ void setup_lcd()
 #define GPIO_INPUT_IO_2 GPIO_NUM_17
 #define GPIO_INPUT_PIN_SEL  ((1ULL<<GPIO_INPUT_IO_0) | (1ULL<<GPIO_INPUT_IO_1) | (1ULL<<GPIO_INPUT_IO_2))
 #define ESP_INTR_FLAG_DEFAULT 0
-//------------------------------------------------------------------------------------------
 static xQueueHandle gpio_evt_queue = nullptr;
-
+volatile int buttons[3] {};
+//------------------------------------------------------------------------------------------
 static void IRAM_ATTR gpio_isr_handler(void* arg)
 {
     uint32_t gpio_num = (uint32_t) arg;
     xQueueSendFromISR(gpio_evt_queue, &gpio_num, nullptr);
 }
-
-volatile int buttons[3] {};
 
 static void vTask_gpio(void* arg)
 {
@@ -98,6 +96,22 @@ void setup_sw()
 }
 
 
+//-------------------------------------- PCF8574 -------------------------------------------
+#define GPIO_EXT_ADDR 0x20
+//------------------------------------------------------------------------------------------
+void set_gpio_ext(bool r1, bool r2, bool r3, bool r4)
+{
+    uint8_t data = 0xFF;
+    if (r1) data &= 0xFE;
+    if (r2) data &= 0xFD;
+    if (r3) data &= 0xFB;
+    if (r4) data &= 0xF7;
+    Wire.beginTransmission(GPIO_EXT_ADDR);
+    Wire.write(data);
+    Wire.endTransmission();
+}
+
+
 WeatherData wdata = {};
 
 static Preferences pref;
@@ -130,6 +144,8 @@ static void vTask_read_sensors(void *p)
     const TickType_t xFrequency = 1 * 1000 / portTICK_PERIOD_MS;
     TickType_t xLastWakeTime = xTaskGetTickCount();
 
+    int r = 0; // TEST
+
     while(true)
     {
         // Wait for the next cycle first, all calculation below will be triggered after the initial period passed
@@ -147,6 +163,10 @@ static void vTask_read_sensors(void *p)
             wdata.temp_f = wdata.temp_c * 9.0 / 5.0 + 32.0;
 
             lcd_update = true;
+
+            r++;
+            set_gpio_ext(r&1, r&2, r&4, r&8);
+
 #ifdef TEST
             Serial.print(wdata.seconds);
             Serial.print(": ");
@@ -178,6 +198,7 @@ void setup()
     setup_webserver();
     setup_lcd();
     setup_sw();
+    set_gpio_ext(1, 1, 1, 1);
 
     // Arduino loop is running on core 1 and priority 1
     // https://techtutorialsx.com/2017/05/09/esp32-running-code-on-a-specific-core
