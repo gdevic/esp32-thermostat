@@ -1,6 +1,7 @@
 #include "main.h"
 #include <Preferences.h>
 
+
 //-------------------------------------- DS18B20 -------------------------------------------
 // Requires library: "DallasTemperature" by Miles Burton
 #include <OneWire.h>
@@ -12,13 +13,13 @@ OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
 //------------------------------------------------------------------------------------------
 
+
 //-------------------------------------- LCD16x2 -------------------------------------------
 // Requires library: "LiquidCrystal_PCF8574"
 #include <LiquidCrystal_PCF8574.h>
 #include <Wire.h>
 LiquidCrystal_PCF8574 lcd(0x27); // Set the I2C LCD address
 //------------------------------------------------------------------------------------------
-
 void setup_lcd()
 {
     Wire.begin();
@@ -32,6 +33,67 @@ void setup_lcd()
     else
         Serial.println("LCD init error: " + String(error, DEC));
 }
+
+
+//-------------------------------------- BUTTONS -------------------------------------------
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/queue.h"
+#include "driver/gpio.h"
+#define GPIO_INPUT_IO_0 GPIO_NUM_15
+#define GPIO_INPUT_IO_1 GPIO_NUM_16
+#define GPIO_INPUT_IO_2 GPIO_NUM_17
+#define GPIO_INPUT_PIN_SEL  ((1ULL<<GPIO_INPUT_IO_0) | (1ULL<<GPIO_INPUT_IO_1) | (1ULL<<GPIO_INPUT_IO_2))
+#define ESP_INTR_FLAG_DEFAULT 0
+//------------------------------------------------------------------------------------------
+static xQueueHandle gpio_evt_queue = nullptr;
+
+static void IRAM_ATTR gpio_isr_handler(void* arg)
+{
+    uint32_t gpio_num = (uint32_t) arg;
+    xQueueSendFromISR(gpio_evt_queue, &gpio_num, nullptr);
+}
+
+volatile int buttons[3] {};
+
+static void vTask_gpio(void* arg)
+{
+    uint32_t io_num;
+    while(true)
+    {
+        if (xQueueReceive(gpio_evt_queue, &io_num, portMAX_DELAY))
+        {
+            bool level = gpio_get_level(gpio_num_t(io_num));
+            if (io_num == GPIO_INPUT_IO_0) buttons[0] += level;
+            if (io_num == GPIO_INPUT_IO_1) buttons[1] += level;
+            if (io_num == GPIO_INPUT_IO_2) buttons[2] += level;
+        }
+    }
+}
+
+void setup_sw()
+{
+    gpio_config_t io_conf
+    {
+        GPIO_INPUT_PIN_SEL,
+        GPIO_MODE_INPUT,
+        GPIO_PULLUP_ENABLE,
+        GPIO_PULLDOWN_DISABLE,
+        GPIO_INTR_NEGEDGE,
+    };
+    gpio_config(&io_conf);
+    // Create a queue to handle gpio events from isr
+    gpio_evt_queue = xQueueCreate(10, sizeof(uint32_t));
+    // Start gpio task
+    xTaskCreate(vTask_gpio, "gpio_task", 2048, nullptr, 10, nullptr);
+    // Install gpio isr service
+    gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT);
+    // Hook isr handlers for specific gpio pins
+    gpio_isr_handler_add(GPIO_INPUT_IO_0, gpio_isr_handler, (void*) GPIO_INPUT_IO_0);
+    gpio_isr_handler_add(GPIO_INPUT_IO_1, gpio_isr_handler, (void*) GPIO_INPUT_IO_1);
+    gpio_isr_handler_add(GPIO_INPUT_IO_2, gpio_isr_handler, (void*) GPIO_INPUT_IO_2);
+}
+
 
 WeatherData wdata = {};
 
@@ -65,7 +127,7 @@ static void vTask_read_sensors(void *p)
     const TickType_t xFrequency = 1 * 1000 / portTICK_PERIOD_MS;
     TickType_t xLastWakeTime = xTaskGetTickCount();
 
-    for (;;)
+    while(true)
     {
         // Wait for the next cycle first, all calculation below will be triggered after the initial period passed
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
@@ -84,7 +146,7 @@ static void vTask_read_sensors(void *p)
             lcd.home();
             lcd.clear();
             lcd.setCursor(0, 0);
-            lcd.print("Hello, World!");
+            lcd.print("SW: " + String(buttons[0], DEC) + "," + String(buttons[1], DEC) + "," + String(buttons[2], DEC));
             lcd.setCursor(0, 1);
             lcd.print("T = " + String(int(wdata.temp_f), DEC) + " F");
 
@@ -118,6 +180,7 @@ void setup()
     setup_wifi();
     setup_webserver();
     setup_lcd();
+    setup_sw();
 
     // Arduino loop is running on core 1 and priority 1
     // https://techtutorialsx.com/2017/05/09/esp32-running-code-on-a-specific-core
@@ -127,7 +190,7 @@ void setup()
         2048,               // Stack size in bytes
         &wdata,             // Parameter passed as input to the task
         1,                  // Priority of the task
-        NULL,               // Task handle
+        nullptr,            // Task handle
         1);                 // Core where the task should run (user program core)
 }
 

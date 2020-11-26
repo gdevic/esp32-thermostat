@@ -4,7 +4,7 @@
 #define FIRMWARE_VERSION "1.00"
 
 // To simply test the code, define TEST
-#define TEST
+//#define TEST
 
 // Period, in seconds, to read sensors
 #define PERIOD_5_SEC  5
