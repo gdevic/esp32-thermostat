@@ -20,6 +20,7 @@ DallasTemperature sensors(&oneWire);
 #include <Wire.h>
 LiquidCrystal_PCF8574 lcd(0x27); // Set the I2C LCD address
 //------------------------------------------------------------------------------------------
+volatile static bool lcd_update = true;
 void setup_lcd()
 {
     Wire.begin();
@@ -67,6 +68,8 @@ static void vTask_gpio(void* arg)
             if (io_num == GPIO_INPUT_IO_0) buttons[0] += level;
             if (io_num == GPIO_INPUT_IO_1) buttons[1] += level;
             if (io_num == GPIO_INPUT_IO_2) buttons[2] += level;
+
+            lcd_update = level;
         }
     }
 }
@@ -85,7 +88,7 @@ void setup_sw()
     // Create a queue to handle gpio events from isr
     gpio_evt_queue = xQueueCreate(10, sizeof(uint32_t));
     // Start gpio task
-    xTaskCreate(vTask_gpio, "gpio_task", 2048, nullptr, 10, nullptr);
+    xTaskCreate(vTask_gpio, "task_gpio", 2048, nullptr, 10, nullptr);
     // Install gpio isr service
     gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT);
     // Hook isr handlers for specific gpio pins
@@ -143,13 +146,7 @@ static void vTask_read_sensors(void *p)
             wdata.temp_c = sensors.getTempCByIndex(0);
             wdata.temp_f = wdata.temp_c * 9.0 / 5.0 + 32.0;
 
-            lcd.home();
-            lcd.clear();
-            lcd.setCursor(0, 0);
-            lcd.print("SW: " + String(buttons[0], DEC) + "," + String(buttons[1], DEC) + "," + String(buttons[2], DEC));
-            lcd.setCursor(0, 1);
-            lcd.print("T = " + String(int(wdata.temp_f), DEC) + " F");
-
+            lcd_update = true;
 #ifdef TEST
             Serial.print(wdata.seconds);
             Serial.print(": ");
@@ -197,4 +194,15 @@ void setup()
 void loop()
 {
     wifi_check_loop();
+    if (lcd_update)
+    {
+        lcd.home();
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("SW: " + String(buttons[0], DEC) + "," + String(buttons[1], DEC) + "," + String(buttons[2], DEC));
+        lcd.setCursor(0, 1);
+        lcd.print("T = " + String(int(wdata.temp_f), DEC) + " F");
+
+        lcd_update = false;
+    }
 }
