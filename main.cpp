@@ -1,6 +1,17 @@
 #include "main.h"
 #include <Preferences.h>
 
+//-------------------------------------- DS18B20 -------------------------------------------//
+// Requires library: "DallasTemperature" by Miles Burton                                    //
+#include <OneWire.h>                                                                        //
+#include <DallasTemperature.h>                                                              //
+#define ONE_WIRE_BUS 5                                                                      //
+// Setup a oneWire instance to communicate with any OneWire device                          //
+OneWire oneWire(ONE_WIRE_BUS);                                                              //
+// Pass oneWire reference to DallasTemperature library                                      //
+DallasTemperature sensors(&oneWire);                                                        //
+//------------------------------------------------------------------------------------------//
+
 WeatherData wdata = {};
 
 static Preferences pref;
@@ -45,7 +56,9 @@ static void vTask_read_sensors(void *p)
             // Fill up data fields with the sensors' (and computed) data
 
             // Read temperature sensor
-            // TODO
+            sensors.requestTemperatures();
+            wdata.temp_c = sensors.getTempCByIndex(0);
+            wdata.temp_f = wdata.temp_c * 9.0 / 5.0 + 32.0;
 
 #ifdef TEST
             Serial.print(wdata.seconds);
