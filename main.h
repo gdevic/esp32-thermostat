@@ -1,5 +1,4 @@
 #include <Arduino.h>
-#include <Wire.h>
 
 // The version string shown in stats. Nothing depends on it and it is used only to confirm newly flashed firmware.
 #define FIRMWARE_VERSION "1.00"

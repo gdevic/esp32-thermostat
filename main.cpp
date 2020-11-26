@@ -1,16 +1,37 @@
 #include "main.h"
 #include <Preferences.h>
 
-//-------------------------------------- DS18B20 -------------------------------------------//
-// Requires library: "DallasTemperature" by Miles Burton                                    //
-#include <OneWire.h>                                                                        //
-#include <DallasTemperature.h>                                                              //
-#define ONE_WIRE_BUS 5                                                                      //
-// Setup a oneWire instance to communicate with any OneWire device                          //
-OneWire oneWire(ONE_WIRE_BUS);                                                              //
-// Pass oneWire reference to DallasTemperature library                                      //
-DallasTemperature sensors(&oneWire);                                                        //
-//------------------------------------------------------------------------------------------//
+//-------------------------------------- DS18B20 -------------------------------------------
+// Requires library: "DallasTemperature" by Miles Burton
+#include <OneWire.h>
+#include <DallasTemperature.h>
+#define ONE_WIRE_BUS 5
+// Setup a oneWire instance to communicate with any OneWire device
+OneWire oneWire(ONE_WIRE_BUS);
+// Pass oneWire reference to DallasTemperature library
+DallasTemperature sensors(&oneWire);
+//------------------------------------------------------------------------------------------
+
+//-------------------------------------- LCD16x2 -------------------------------------------
+// Requires library: "LiquidCrystal_PCF8574"
+#include <LiquidCrystal_PCF8574.h>
+#include <Wire.h>
+LiquidCrystal_PCF8574 lcd(0x27); // Set the I2C LCD address
+//------------------------------------------------------------------------------------------
+
+void setup_lcd()
+{
+    Wire.begin();
+    Wire.beginTransmission(0x27);
+    int error = Wire.endTransmission();
+    if (error == 0)
+    {
+        lcd.begin(16, 2); // Initialize the lcd
+        lcd.setBacklight(1);
+    }
+    else
+        Serial.println("LCD init error: " + String(error, DEC));
+}
 
 WeatherData wdata = {};
 
@@ -60,6 +81,13 @@ static void vTask_read_sensors(void *p)
             wdata.temp_c = sensors.getTempCByIndex(0);
             wdata.temp_f = wdata.temp_c * 9.0 / 5.0 + 32.0;
 
+            lcd.home();
+            lcd.clear();
+            lcd.setCursor(0, 0);
+            lcd.print("Hello, World!");
+            lcd.setCursor(0, 1);
+            lcd.print("T = " + String(int(wdata.temp_f), DEC) + " F");
+
 #ifdef TEST
             Serial.print(wdata.seconds);
             Serial.print(": ");
@@ -89,6 +117,7 @@ void setup()
 
     setup_wifi();
     setup_webserver();
+    setup_lcd();
 
     // Arduino loop is running on core 1 and priority 1
     // https://techtutorialsx.com/2017/05/09/esp32-running-code-on-a-specific-core
