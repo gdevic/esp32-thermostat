@@ -1,6 +1,8 @@
 #include "main.h"
 #include <Preferences.h>
 
+#include "thermostat.h"
+#include "control.h"
 
 //-------------------------------------- DS18B20 -------------------------------------------
 // Requires library: "DallasTemperature" by Miles Burton
@@ -19,7 +21,6 @@ DallasTemperature sensors(&oneWire);
 #include <LiquidCrystal_PCF8574.h>
 #include <Wire.h>
 LiquidCrystal_PCF8574 lcd(0x27); // Set the I2C LCD address
-volatile static bool lcd_update = true;
 //------------------------------------------------------------------------------------------
 void setup_lcd()
 {
@@ -66,8 +67,6 @@ static void vTask_gpio(void* arg)
             if (io_num == GPIO_INPUT_IO_0) buttons[0] += level;
             if (io_num == GPIO_INPUT_IO_1) buttons[1] += level;
             if (io_num == GPIO_INPUT_IO_2) buttons[2] += level;
-
-            lcd_update = level;
         }
     }
 }
@@ -96,23 +95,9 @@ void setup_sw()
 }
 
 
-//-------------------------------------- PCF8574 -------------------------------------------
-#define GPIO_EXT_ADDR 0x20
-//------------------------------------------------------------------------------------------
-void set_gpio_ext(bool r1, bool r2, bool r3, bool r4)
-{
-    uint8_t data = 0xFF;
-    if (r1) data &= 0xFE;
-    if (r2) data &= 0xFD;
-    if (r3) data &= 0xFB;
-    if (r4) data &= 0xF7;
-    Wire.beginTransmission(GPIO_EXT_ADDR);
-    Wire.write(data);
-    Wire.endTransmission();
-}
-
-
-WeatherData wdata = {};
+StationData wdata = {};
+CControl control;
+CThermostat th;
 
 static Preferences pref;
 
@@ -144,8 +129,6 @@ static void vTask_read_sensors(void *p)
     const TickType_t xFrequency = 1 * 1000 / portTICK_PERIOD_MS;
     TickType_t xLastWakeTime = xTaskGetTickCount();
 
-    int r = 0; // TEST
-
     while(true)
     {
         // Wait for the next cycle first, all calculation below will be triggered after the initial period passed
@@ -162,10 +145,12 @@ static void vTask_read_sensors(void *p)
             wdata.temp_c = sensors.getTempCByIndex(0);
             wdata.temp_f = wdata.temp_c * 9.0 / 5.0 + 32.0;
 
-            lcd_update = true;
-
-            r++;
-            set_gpio_ext(r&1, r&2, r&4, r&8);
+            lcd.home();
+            lcd.clear();
+            lcd.setCursor(0, 0);
+            lcd.print("SW: " + String(buttons[0], DEC) + "," + String(buttons[1], DEC) + "," + String(buttons[2], DEC));
+            lcd.setCursor(0, 1);
+            lcd.print("T = " + String(int(wdata.temp_f), DEC) + " F");
 
 #ifdef TEST
             Serial.print(wdata.seconds);
@@ -198,7 +183,6 @@ void setup()
     setup_webserver();
     setup_lcd();
     setup_sw();
-    set_gpio_ext(1, 1, 1, 1);
 
     // Arduino loop is running on core 1 and priority 1
     // https://techtutorialsx.com/2017/05/09/esp32-running-code-on-a-specific-core
@@ -215,15 +199,4 @@ void setup()
 void loop()
 {
     wifi_check_loop();
-    if (lcd_update)
-    {
-        lcd.home();
-        lcd.clear();
-        lcd.setCursor(0, 0);
-        lcd.print("SW: " + String(buttons[0], DEC) + "," + String(buttons[1], DEC) + "," + String(buttons[2], DEC));
-        lcd.setCursor(0, 1);
-        lcd.print("T = " + String(int(wdata.temp_f), DEC) + " F");
-
-        lcd_update = false;
-    }
 }
