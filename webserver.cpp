@@ -47,6 +47,7 @@ void webserver_set_response()
     webtext_root += "\nID = " + wdata.id;
     webtext_root += "\nTAG = " + wdata.tag;
     webtext_root += "\nMAC = " + wifi_mac;
+    webtext_root += "\nerrors = " + String(wdata.errors);
     webtext_root += "\nuptime = " + get_uptime_str(wdata.seconds);
     webtext_root += "\nreconnects = " + String(reconnects);
     webtext_root += "\nRSSI = " + String(WiFi.RSSI()); // Signal strength
@@ -61,6 +62,7 @@ void webserver_set_response()
     webtext_json += " \"id\":\"" + wdata.id + "\"";
     webtext_json += ", \"tag\":\"" + wdata.tag + "\"";
     webtext_json += ", \"uptime\":" + String(wdata.seconds);
+    webtext_json += ", \"errors\":" + String(wdata.errors);
     // When out of reset, and until the very fist time we had a chance to read sensors and calculate some meaningful
     // values, do not attempt to return any data nodes
     if (wdata.seconds > PERIOD_5_SEC)

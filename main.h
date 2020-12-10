@@ -18,9 +18,14 @@ struct StationData
     float temp_f;       // Current temperature in "F"
 
     uint32_t seconds;   // Uptime seconds counter (shown as "uptime" in web reports)
+    uint32_t errors;    // Bitfield containing possible errors
 };
 
+// Possible errors
+#define ERROR_LCD_INIT   0x0001
+
 // Specific to ESP32's FreeRTOS port
+// Arduino loop is running on core 1 and priority 1, https://techtutorialsx.com/2017/05/09/esp32-running-code-on-a-specific-core
 #define PRO_CPU 0
 #define APP_CPU 1
 

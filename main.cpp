@@ -21,19 +21,31 @@ DallasTemperature sensors(&oneWire);
 #include <LiquidCrystal_PCF8574.h>
 #include <Wire.h>
 LiquidCrystal_PCF8574 lcd(0x27); // Set the I2C LCD address
+
+// The maximum number of messages that can be waiting for I2C task at any one time
+#define I2C_QUEUE_SIZE 5
+
+// Type of the message sent to the I2C task
+typedef struct
+{
+    portBASE_TYPE xMessageType;
+    char *pcMessage;
+} xI2CMessage;
+
+#define I2C_READ_TEMP  0
+#define I2C_LCD_INIT   1
+#define I2C_PRINT_SW   2
+
+QueueHandle_t xI2CQueue; // The queue used to send messages to the I2C task
 //------------------------------------------------------------------------------------------
 void setup_lcd()
 {
-    Wire.begin();
-    Wire.beginTransmission(0x27);
-    int error = Wire.endTransmission();
-    if (error == 0)
-    {
-        lcd.begin(16, 2); // Initialize the lcd
-        lcd.setBacklight(1);
-    }
-    else
-        Serial.println("LCD init error: " + String(error, DEC));
+    xI2CMessage xMessage;
+    // Create the queue used by the I2C task
+    xI2CQueue = xQueueCreate(I2C_QUEUE_SIZE, sizeof(xI2CMessage));
+
+    xMessage.xMessageType = I2C_LCD_INIT;
+    xQueueSend(xI2CQueue, &xMessage, portMAX_DELAY);
 }
 
 
@@ -58,16 +70,20 @@ static void IRAM_ATTR gpio_isr_handler(void* arg)
 
 static void vTask_gpio(void* arg)
 {
+    xI2CMessage xMessage;
     uint32_t io_num;
+
     while(true)
     {
-        if (xQueueReceive(gpio_evt_queue, &io_num, portMAX_DELAY))
-        {
-            bool level = gpio_get_level(gpio_num_t(io_num));
-            if (io_num == GPIO_INPUT_IO_0) buttons[0] += level;
-            if (io_num == GPIO_INPUT_IO_1) buttons[1] += level;
-            if (io_num == GPIO_INPUT_IO_2) buttons[2] += level;
-        }
+        while(xQueueReceive(gpio_evt_queue, &io_num, portMAX_DELAY) != pdPASS);
+
+        bool level = !gpio_get_level(gpio_num_t(io_num));
+        if (io_num == GPIO_INPUT_IO_0) buttons[0] += level;
+        if (io_num == GPIO_INPUT_IO_1) buttons[1] += level;
+        if (io_num == GPIO_INPUT_IO_2) buttons[2] += level;
+
+        xMessage.xMessageType = I2C_PRINT_SW;
+        xQueueSend(xI2CQueue, &xMessage, portMAX_DELAY);
     }
 }
 
@@ -128,6 +144,7 @@ static void vTask_read_sensors(void *p)
     // Make this task sleep and awake once a second
     const TickType_t xFrequency = 1 * 1000 / portTICK_PERIOD_MS;
     TickType_t xLastWakeTime = xTaskGetTickCount();
+    xI2CMessage xMessage;
 
     while(true)
     {
@@ -135,32 +152,11 @@ static void vTask_read_sensors(void *p)
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
         wdata.seconds++;
 
-        // Once every 5 seconds, read all sensors and recalculate relevant data
+        // Once every 5 seconds, read temperature sensor
         if ((wdata.seconds % PERIOD_5_SEC) == 0)
         {
-            // Fill up data fields with the sensors' (and computed) data
-
-            // Read temperature sensor
-            sensors.requestTemperatures();
-            wdata.temp_c = sensors.getTempCByIndex(0);
-            wdata.temp_f = wdata.temp_c * 9.0 / 5.0 + 32.0;
-
-            lcd.home();
-            lcd.clear();
-            lcd.setCursor(0, 0);
-            lcd.print("SW: " + String(buttons[0], DEC) + "," + String(buttons[1], DEC) + "," + String(buttons[2], DEC));
-            lcd.setCursor(0, 1);
-            lcd.print("T = " + String(int(wdata.temp_f), DEC) + " F");
-
-#ifdef TEST
-            Serial.print(wdata.seconds);
-            Serial.print(": ");
-            Serial.print(wdata.temp_c);
-            Serial.print(" C ");
-            Serial.print(wdata.temp_f);
-            Serial.print(" F ");
-            Serial.println("");
-#endif // TEST
+            xMessage.xMessageType = I2C_READ_TEMP;
+            xQueueSend(xI2CQueue, &xMessage, portMAX_DELAY);
         }
         // At the end, preset various response strings that the server should give out. This will happen once a second,
         // whether we have any new data or not.
@@ -168,10 +164,55 @@ static void vTask_read_sensors(void *p)
     }
 }
 
+// This task owns the exclusive right to talk to the devices on the I2C bus: LCD, temp sensor and GPIO relays
+static void vTask_I2C(void *p)
+{
+    xI2CMessage xMessage;
+
+    while(true)
+    {
+        // Wait for the I2C task message to arrive
+        while(xQueueReceive(xI2CQueue, &xMessage, portMAX_DELAY) != pdPASS);
+
+        if (xMessage.xMessageType == I2C_READ_TEMP)
+        {
+            // Read temperature sensor
+            sensors.requestTemperatures();
+            wdata.temp_c = sensors.getTempCByIndex(0);
+            wdata.temp_f = wdata.temp_c * 9.0 / 5.0 + 32.0;
+
+            // Update temperature on the screen
+            lcd.setCursor(0, 1);
+            lcd.print("T = " + String(int(wdata.temp_f), DEC) + " F");
+        }
+        if (xMessage.xMessageType == I2C_LCD_INIT)
+        {
+            Wire.begin();
+            Wire.beginTransmission(0x27);
+            if (Wire.endTransmission(true))
+                wdata.errors |= ERROR_LCD_INIT;
+
+            lcd.begin(16, 2); // Initialize the lcd
+            lcd.home();
+            lcd.clear();
+            lcd.setBacklight(1);
+            lcd.setCursor(0, 0);
+            lcd.print("Init...");
+        }
+        if (xMessage.xMessageType == I2C_PRINT_SW)
+        {
+            lcd.setCursor(0, 0);
+            lcd.print("SW: " + String(buttons[0], DEC) + "," + String(buttons[1], DEC) + "," + String(buttons[2], DEC));
+        }
+    }
+}
+
 void setup()
 {
+    // Start with some delay to buffer out quick power glitches
+    //delay(2000); // TBD
+
     Serial.begin(115200);
-    delay(100);
 
     // Read the initial values stored in the NVM
     pref.begin("wd", true);
@@ -184,8 +225,15 @@ void setup()
     setup_lcd();
     setup_sw();
 
-    // Arduino loop is running on core 1 and priority 1
-    // https://techtutorialsx.com/2017/05/09/esp32-running-code-on-a-specific-core
+    xTaskCreatePinnedToCore(
+        vTask_I2C,          // Task function
+        "task_i2c",         // Name of the task
+        2048,               // Stack size in bytes
+        nullptr,            // Parameter passed as input to the task
+        tskIDLE_PRIORITY,   // Priority of the task
+        nullptr,            // Task handle
+        APP_CPU);           // Core where the task should run (user program core)
+
     xTaskCreatePinnedToCore(
         vTask_read_sensors, // Task function
         "task_sensors",     // String with name of the task
