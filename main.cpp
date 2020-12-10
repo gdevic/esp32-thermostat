@@ -38,7 +38,7 @@ typedef struct
 
 QueueHandle_t xI2CQueue; // The queue used to send messages to the I2C task
 //------------------------------------------------------------------------------------------
-void setup_lcd()
+void setup_i2c()
 {
     xI2CMessage xMessage;
     // Create the queue used by the I2C task
@@ -48,6 +48,31 @@ void setup_lcd()
     xQueueSend(xI2CQueue, &xMessage, portMAX_DELAY);
 }
 
+static void lcd_init()
+{
+    Wire.begin();
+    Wire.beginTransmission(0x27);
+    if (Wire.endTransmission(true))
+        wdata.status |= STATUS_LCD_INIT_ERROR;
+
+    // Custom char generator: https://maxpromer.github.io/LCD-Character-Creator
+    static int customCharAir[]  = { B00000, B00000, B00000, B01101, B11010, B00000, B01101, B11010 };
+    static int customCharDown[] = { B00000, B00000, B11111, B11111, B01110, B01110, B00100, B00100 };
+    static int customCharUp[]   = { B00000, B00000, B00100, B00100, B01110, B01110, B11111, B11111 };
+
+    lcd.begin(16, 2);
+    lcd.createChar(0, customCharAir);
+    lcd.createChar(1, customCharDown);
+    lcd.createChar(2, customCharUp);
+    lcd.clear();
+    lcd.setBacklight(1);
+    lcd.setCursor(9, 1);
+    lcd.write(uint8_t(0)); // FAN
+    lcd.setCursor(12, 1);
+    lcd.write(uint8_t(1)); // TEMP DOWN
+    lcd.setCursor(15, 1);
+    lcd.write(uint8_t(2)); // TEMP UP
+}
 
 //-------------------------------------- BUTTONS -------------------------------------------
 #include "freertos/FreeRTOS.h"
@@ -78,12 +103,15 @@ static void vTask_gpio(void* arg)
         while(xQueueReceive(gpio_evt_queue, &io_num, portMAX_DELAY) != pdPASS);
 
         bool level = !gpio_get_level(gpio_num_t(io_num));
-        if (io_num == GPIO_INPUT_IO_0) buttons[0] += level;
-        if (io_num == GPIO_INPUT_IO_1) buttons[1] += level;
-        if (io_num == GPIO_INPUT_IO_2) buttons[2] += level;
+        if (level) // Consider buttons only on a button press edge
+        {
+            if (io_num == GPIO_INPUT_IO_0) buttons[0] += level;
+            if (io_num == GPIO_INPUT_IO_1) buttons[1] += level;
+            if (io_num == GPIO_INPUT_IO_2) buttons[2] += level;
 
-        xMessage.xMessageType = I2C_PRINT_SW;
-        xQueueSend(xI2CQueue, &xMessage, portMAX_DELAY);
+            xMessage.xMessageType = I2C_PRINT_SW;
+            xQueueSend(xI2CQueue, &xMessage, portMAX_DELAY);
+        }
     }
 }
 
@@ -172,7 +200,8 @@ static void vTask_I2C(void *p)
     while(true)
     {
         // Wait for the I2C task message to arrive
-        while(xQueueReceive(xI2CQueue, &xMessage, portMAX_DELAY) != pdPASS);
+        while((wdata.status & STATUS_HOLD) ||
+              (xQueueReceive(xI2CQueue, &xMessage, portMAX_DELAY) != pdPASS));
 
         if (xMessage.xMessageType == I2C_READ_TEMP)
         {
@@ -182,27 +211,17 @@ static void vTask_I2C(void *p)
             wdata.temp_f = wdata.temp_c * 9.0 / 5.0 + 32.0;
 
             // Update temperature on the screen
-            lcd.setCursor(0, 1);
-            lcd.print("T = " + String(int(wdata.temp_f), DEC) + " F");
+            lcd.setCursor(0, 0);
+            lcd.print(String(int(wdata.temp_f), DEC) + " F");
         }
         if (xMessage.xMessageType == I2C_LCD_INIT)
         {
-            Wire.begin();
-            Wire.beginTransmission(0x27);
-            if (Wire.endTransmission(true))
-                wdata.errors |= ERROR_LCD_INIT;
-
-            lcd.begin(16, 2); // Initialize the lcd
-            lcd.home();
-            lcd.clear();
-            lcd.setBacklight(1);
-            lcd.setCursor(0, 0);
-            lcd.print("Init...");
+            lcd_init();
         }
         if (xMessage.xMessageType == I2C_PRINT_SW)
         {
-            lcd.setCursor(0, 0);
-            lcd.print("SW: " + String(buttons[0], DEC) + "," + String(buttons[1], DEC) + "," + String(buttons[2], DEC));
+            lcd.setCursor(0, 1);
+            lcd.print(String(buttons[0], DEC) + "," + String(buttons[1], DEC) + "," + String(buttons[2], DEC));
         }
     }
 }
@@ -222,7 +241,7 @@ void setup()
 
     setup_wifi();
     setup_webserver();
-    setup_lcd();
+    setup_i2c();
     setup_sw();
 
     xTaskCreatePinnedToCore(

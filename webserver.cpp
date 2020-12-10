@@ -47,7 +47,7 @@ void webserver_set_response()
     webtext_root += "\nID = " + wdata.id;
     webtext_root += "\nTAG = " + wdata.tag;
     webtext_root += "\nMAC = " + wifi_mac;
-    webtext_root += "\nerrors = " + String(wdata.errors);
+    webtext_root += "\nstatus = " + String(wdata.status);
     webtext_root += "\nuptime = " + get_uptime_str(wdata.seconds);
     webtext_root += "\nreconnects = " + String(reconnects);
     webtext_root += "\nRSSI = " + String(WiFi.RSSI()); // Signal strength
@@ -62,7 +62,7 @@ void webserver_set_response()
     webtext_json += " \"id\":\"" + wdata.id + "\"";
     webtext_json += ", \"tag\":\"" + wdata.tag + "\"";
     webtext_json += ", \"uptime\":" + String(wdata.seconds);
-    webtext_json += ", \"errors\":" + String(wdata.errors);
+    webtext_json += ", \"status\":" + String(wdata.status);
     // When out of reset, and until the very fist time we had a chance to read sensors and calculate some meaningful
     // values, do not attempt to return any data nodes
     if (wdata.seconds > PERIOD_5_SEC)
@@ -172,12 +172,14 @@ void setup_ota()
         // Serial.printf("Uploading: index=%d len=%d final=%d\n", index, len, final);
         if (index == 0)
         {
+            wdata.status |= STATUS_HOLD;
             Serial.printf("Uploading: %s\n", filename.c_str());
             if (!Update.begin(UPDATE_SIZE_UNKNOWN)) // start with max available size
                 Update.printError(Serial);
         }
         if (!Update.hasError())
         {
+            wdata.status &= ~STATUS_HOLD;
             if (Update.write(data, len) != len) // flashing firmware to ESP
                 Update.printError(Serial);
         }
@@ -190,6 +192,7 @@ void setup_ota()
             }
             else
                 Update.printError(Serial);
+            wdata.status &= ~STATUS_HOLD;
         }
     });
 }
