@@ -172,14 +172,12 @@ void setup_ota()
         // Serial.printf("Uploading: index=%d len=%d final=%d\n", index, len, final);
         if (index == 0)
         {
-            wdata.status |= STATUS_HOLD;
             Serial.printf("Uploading: %s\n", filename.c_str());
             if (!Update.begin(UPDATE_SIZE_UNKNOWN)) // start with max available size
                 Update.printError(Serial);
         }
         if (!Update.hasError())
         {
-            wdata.status &= ~STATUS_HOLD;
             if (Update.write(data, len) != len) // flashing firmware to ESP
                 Update.printError(Serial);
         }
@@ -192,7 +190,6 @@ void setup_ota()
             }
             else
                 Update.printError(Serial);
-            wdata.status &= ~STATUS_HOLD;
         }
     });
 }

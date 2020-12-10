@@ -23,7 +23,6 @@ struct StationData
 
 // Possible errors
 #define STATUS_LCD_INIT_ERROR   0x0001 // LCD was not able to initialize
-#define STATUS_HOLD             0x8000 // Hold the LCD display from updating (fixes corruption on reflash)
 
 // Specific to ESP32's FreeRTOS port
 // Arduino loop is running on core 1 and priority 1, https://techtutorialsx.com/2017/05/09/esp32-running-code-on-a-specific-core

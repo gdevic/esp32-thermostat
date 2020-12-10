@@ -200,8 +200,7 @@ static void vTask_I2C(void *p)
     while(true)
     {
         // Wait for the I2C task message to arrive
-        while((wdata.status & STATUS_HOLD) ||
-              (xQueueReceive(xI2CQueue, &xMessage, portMAX_DELAY) != pdPASS));
+        while(xQueueReceive(xI2CQueue, &xMessage, portMAX_DELAY) != pdPASS);
 
         if (xMessage.xMessageType == I2C_READ_TEMP)
         {
@@ -210,9 +209,9 @@ static void vTask_I2C(void *p)
             wdata.temp_c = sensors.getTempCByIndex(0);
             wdata.temp_f = wdata.temp_c * 9.0 / 5.0 + 32.0;
 
-            // Update temperature on the screen
+            // Update temperature on the screen, round to the nearest
             lcd.setCursor(0, 0);
-            lcd.print(String(int(wdata.temp_f), DEC) + " F");
+            lcd.print(String(int(wdata.temp_f + 0.5), DEC) + " F");
         }
         if (xMessage.xMessageType == I2C_LCD_INIT)
         {
