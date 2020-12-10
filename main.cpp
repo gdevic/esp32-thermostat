@@ -56,22 +56,30 @@ static void lcd_init()
         wdata.status |= STATUS_LCD_INIT_ERROR;
 
     // Custom char generator: https://maxpromer.github.io/LCD-Character-Creator
-    static int customCharAir[]  = { B00000, B00000, B00000, B01101, B11010, B00000, B01101, B11010 };
-    static int customCharDown[] = { B00000, B00000, B11111, B11111, B01110, B01110, B00100, B00100 };
-    static int customCharUp[]   = { B00000, B00000, B00100, B00100, B01110, B01110, B11111, B11111 };
+    static int customCharAir[]    = { B00000, B00000, B00000, B01101, B11010, B00000, B01101, B11010 };
+    static int customCharAirInv[] = { B11111, B11111, B11111, B10010, B00101, B11111, B10010, B00101 };
+    static int customCharDown[]   = { B00000, B00000, B11111, B11111, B01110, B01110, B00100, B00100 };
+    static int customCharUp[]     = { B00000, B00000, B00100, B00100, B01110, B01110, B11111, B11111 };
+
+#define CHAR_AIR     0
+#define CHAR_AIR_INV 1
+#define CHAR_DOWN    2
+#define CHAR_UP      3
 
     lcd.begin(16, 2);
-    lcd.createChar(0, customCharAir);
-    lcd.createChar(1, customCharDown);
-    lcd.createChar(2, customCharUp);
+    lcd.createChar(CHAR_AIR, customCharAir);
+    lcd.createChar(CHAR_AIR_INV, customCharAirInv);
+    lcd.createChar(CHAR_DOWN, customCharDown);
+    lcd.createChar(CHAR_UP, customCharUp);
+
     lcd.clear();
     lcd.setBacklight(1);
     lcd.setCursor(9, 1);
-    lcd.write(uint8_t(0)); // FAN
+    lcd.write(uint8_t(CHAR_AIR)); // FAN
     lcd.setCursor(12, 1);
-    lcd.write(uint8_t(1)); // TEMP DOWN
+    lcd.write(uint8_t(CHAR_DOWN)); // TEMP DOWN
     lcd.setCursor(15, 1);
-    lcd.write(uint8_t(2)); // TEMP UP
+    lcd.write(uint8_t(CHAR_UP)); // TEMP UP
 }
 
 //-------------------------------------- BUTTONS -------------------------------------------
