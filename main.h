@@ -20,6 +20,10 @@ struct StationData
     uint32_t seconds;   // Uptime seconds counter (shown as "uptime" in web reports)
 };
 
+// Specific to ESP32's FreeRTOS port
+#define PRO_CPU 0
+#define APP_CPU 1
+
 extern StationData wdata;
 
 // From main.cpp

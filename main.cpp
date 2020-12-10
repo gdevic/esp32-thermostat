@@ -193,7 +193,7 @@ void setup()
         &wdata,             // Parameter passed as input to the task
         1,                  // Priority of the task
         nullptr,            // Task handle
-        1);                 // Core where the task should run (user program core)
+        APP_CPU);           // Core where the task should run (user program core)
 }
 
 void loop()
