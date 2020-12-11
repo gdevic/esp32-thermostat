@@ -53,8 +53,11 @@ void webserver_set_response()
     webtext_root += "\nreconnects = " + String(reconnects);
     webtext_root += "\nRSSI = " + String(WiFi.RSSI()); // Signal strength
     webtext_root += "\nINT_C = " + String((temprature_sens_read() - 32) / 1.8);
-    webtext_root += "\ntemp_c = " + String(wdata.temp_c);
-    webtext_root += "\ntemp_f = " + String(wdata.temp_f);
+    if (wdata.temp_valid) // Display the temperature value only if it is valid
+    {
+        webtext_root += "\ntemp_c = " + String(wdata.temp_c);
+        webtext_root += "\ntemp_f = " + String(wdata.temp_f);
+    }
     webtext_root += "\ntemp_valid = " + String(wdata.temp_valid);
     webtext_root += "\nrelays = " + String(wdata.relays);
     webtext_root += "\nfan_mode = " + String(wdata.fan_mode);
@@ -67,8 +70,11 @@ void webserver_set_response()
     webtext_json += ", \"tag\":\"" + wdata.tag + "\"";
     webtext_json += ", \"uptime\":" + String(wdata.seconds);
     webtext_json += ", \"status\":" + String(wdata.status);
-    webtext_json += ", \"temp_c\":" + String(wdata.temp_c);
-    webtext_json += ", \"temp_f\":" + String(wdata.temp_f);
+    if (wdata.temp_valid) // Add the temperature valid only if it is valid
+    {
+        webtext_json += ", \"temp_c\":" + String(wdata.temp_c);
+        webtext_json += ", \"temp_f\":" + String(wdata.temp_f);
+    }
     webtext_json += ", \"temp_valid\":" + String(wdata.temp_valid);
     webtext_json += ", \"relays\":" + String(wdata.relays);
     webtext_json += ", \"fan_mode\":" + String(wdata.fan_mode);
