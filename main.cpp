@@ -182,7 +182,7 @@ void setup_sw()
 void pref_set(const char* name, uint8_t value)
 {
     pref.begin("wd", false);
-    pref.putUInt(name, value);
+    pref.putUChar(name, value);
     pref.end();
 }
 
@@ -306,8 +306,7 @@ static void vTask_I2C(void *p)
 
 void setup()
 {
-    // Start with some delay to buffer out quick power glitches
-    delay(2000);
+    delay(2000); // Start with some delay to buffer out quick power glitches
 
     Serial.begin(115200);
 
@@ -342,6 +341,13 @@ void setup()
         tskIDLE_PRIORITY,    // Priority of the task
         nullptr,             // Task handle
         APP_CPU);            // Core where the task should run (user program core)
+
+    delay(1000); // Give a second for all the tasks to start
+
+    // Recover controller state
+    pref.begin("wd", false);
+    control.set_fan_mode(pref.getUChar("fan_mode", FAN_MODE_OFF));
+    pref.end();
 }
 
 void loop()

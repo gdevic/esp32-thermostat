@@ -18,7 +18,7 @@ struct StationData
     float temp_f;       // Current temperature in "F"
     bool temp_valid;    // True if termperature reading is correct
 
-    uint8_t fan_mode;   // Fan operation mode: OFF, ON, CYC
+    uint8_t fan_mode;   // [NV] Fan operation mode: OFF, ON, CYC
 #define FAN_MODE_OFF  0
 #define FAN_MODE_ON   1
 #define FAN_MODE_CYC  2

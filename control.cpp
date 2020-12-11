@@ -23,8 +23,6 @@ static void vTask_control(void *p)
 
 CControl::CControl()
 {
-    m_fan_mode = wdata.fan_mode;
-
     xTaskCreatePinnedToCore(
         vTask_control,       // Task function
         "task_control",      // Name of the task
@@ -80,7 +78,10 @@ void CControl::set_fan_mode(uint8_t fan_mode)
         fan_mode = 0;
     wdata.fan_mode = fan_mode;
 
-    // Display the new fan mode on the LCD
+    // Set the new value into the NV variable
+    pref_set("fan_mode", wdata.fan_mode);
+
+    // Display the current fan mode on the LCD
     xI2CMessage xMessage;
     xMessage.xMessageType = I2C_PRINT_FAN;
     xQueueSend(xI2CQueue, &xMessage, portMAX_DELAY);
