@@ -3,6 +3,7 @@
 #include <ESPAsyncWebServer.h>
 #include <ESPmDNS.h>
 #include <Update.h>
+#include "control.h"
 
 // Async web server needs these two additional libraries:
 // https://github.com/me-no-dev/ESPAsyncWebServer
@@ -55,6 +56,8 @@ void webserver_set_response()
     webtext_root += "\ntemp_c = " + String(wdata.temp_c);
     webtext_root += "\ntemp_f = " + String(wdata.temp_f);
     webtext_root += "\ntemp_valid = " + String(wdata.temp_valid);
+    webtext_root += "\nrelays = " + String(wdata.relays);
+    webtext_root += "\nfan_mode = " + String(wdata.fan_mode);
 
     webtext_root += String("</pre></body></html>\n");
 
@@ -67,6 +70,8 @@ void webserver_set_response()
     webtext_json += ", \"temp_c\":" + String(wdata.temp_c);
     webtext_json += ", \"temp_f\":" + String(wdata.temp_f);
     webtext_json += ", \"temp_valid\":" + String(wdata.temp_valid);
+    webtext_json += ", \"relays\":" + String(wdata.relays);
+    webtext_json += ", \"fan_mode\":" + String(wdata.fan_mode);
     webtext_json += " }";
 
     xSemaphoreGive(webtext_semaphore);
@@ -97,6 +102,7 @@ void handleJson(AsyncWebServerRequest *request)
 }
 
 template<class T> T parse(String value, char **p_next);
+template<> inline uint8_t parse<uint8_t>(String value, char **p_next) { return strtoul(value.c_str(), p_next, 0); }
 template<> inline uint32_t parse<uint32_t>(String value, char **p_next) { return strtoul(value.c_str(), p_next, 0); }
 template<> inline float parse<float>(String value, char **p_next) { return strtof(value.c_str(), p_next); }
 template<> inline String parse<String>(String value, char **p_next)
@@ -121,8 +127,13 @@ static bool get_parse_value(AsyncWebServerRequest *request, String key_name, T& 
         bool is_string = sizeof(T) == sizeof(String); // Little trick to tell String type apart without having the RTTI support
         if (is_string || ((p_next != value.c_str()) && (*p_next == 0) && (errno != ERANGE)))
         {
-            dest = n; // Set the wdata.<key_name> member
-            pref_set(key_name.c_str(), n); // Set the new value into the NV variable
+            if (key_name == "fan_mode")
+                control.set_fan_mode(n);
+            else
+            {
+                dest = n; // Set the wdata.<key_name> member
+                pref_set(key_name.c_str(), n); // Set the new value into the NV variable
+            }
             request->send(200, "text/html", "OK " + String(n));
             return true;
         }
@@ -139,6 +150,7 @@ void handleSet(AsyncWebServerRequest *request)
         bool ok = false;
         ok |= get_parse_value(request, "id", wdata.id);
         ok |= get_parse_value(request, "tag", wdata.tag);
+        ok |= get_parse_value(request, "fan_mode", wdata.fan_mode);
         if (!ok)
             request->send(400, "text/html", "?");
 

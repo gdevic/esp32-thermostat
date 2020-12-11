@@ -2,6 +2,10 @@
 #include <Preferences.h>
 #include "control.h"
 
+StationData wdata = {};
+CControl control;
+Preferences pref;
+
 //-------------------------------------- DS18B20 -------------------------------------------
 // Requires library: "DallasTemperature" by Miles Burton
 #include <OneWire.h>
@@ -14,6 +18,11 @@ DallasTemperature sensors(&oneWire);
 //------------------------------------------------------------------------------------------
 
 
+//-------------------------------------- PCF8574 -------------------------------------------
+#define GPIO_EXT_ADDR 0x20
+//------------------------------------------------------------------------------------------
+
+
 //-------------------------------------- LCD16x2 -------------------------------------------
 // Requires library: "LiquidCrystal_PCF8574"
 #include <LiquidCrystal_PCF8574.h>
@@ -22,20 +31,6 @@ LiquidCrystal_PCF8574 lcd(0x27); // Set the I2C LCD address
 
 // The maximum number of messages that can be waiting for I2C task at any one time
 #define I2C_QUEUE_SIZE 5
-
-// Type of the message sent to the I2C task
-typedef struct
-{
-    portBASE_TYPE xMessageType;
-    char *pcMessage;
-} xI2CMessage;
-
-#define I2C_READ_TEMP    0
-#define I2C_LCD_INIT     1
-#define I2C_PRINT_FAN    2
-#define I2C_PRINT_AC     3
-#define I2C_PRINT_TARGET 4
-
 QueueHandle_t xI2CQueue; // The queue used to send messages to the I2C task
 //------------------------------------------------------------------------------------------
 void setup_i2c()
@@ -123,12 +118,7 @@ static void vTask_gpio(void* arg)
             // Manual fan mode button
             if (button_index == BUTTON_INDEX_FAN)
             {
-                wdata.fan_mode++;
-                if (wdata.fan_mode > FAN_MODE_LAST)
-                    wdata.fan_mode = 0;
-
-                xMessage.xMessageType = I2C_PRINT_FAN;
-                xQueueSend(xI2CQueue, &xMessage, portMAX_DELAY);
+                control.set_fan_mode(wdata.fan_mode + 1); // control class with wrap the value back to 0
             }
 
             // Switch heating/cooling modes by pressing both buttons at the same time
@@ -178,7 +168,7 @@ void setup_sw()
     // Create a queue to handle gpio events from isr
     gpio_evt_queue = xQueueCreate(5, sizeof(uint32_t));
     // Start gpio task
-    xTaskCreate(vTask_gpio, "task_gpio", 2048, nullptr, 10, nullptr);
+    xTaskCreate(vTask_gpio, "task_gpio", 2048, nullptr, tskIDLE_PRIORITY + 4, nullptr);
     // Install gpio isr service
     gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT);
     // Hook isr handlers for specific gpio pins
@@ -188,11 +178,14 @@ void setup_sw()
 }
 
 
-StationData wdata = {};
-CControl control;
-Preferences pref;
+// Set a preference string value pairs, we are using char, int, float and string variants
+void pref_set(const char* name, uint8_t value)
+{
+    pref.begin("wd", false);
+    pref.putUInt(name, value);
+    pref.end();
+}
 
-// Set a preference string value pairs, we are using int, float and string variants
 void pref_set(const char* name, uint32_t value)
 {
     pref.begin("wd", false);
@@ -249,6 +242,14 @@ static void vTask_I2C(void *p)
         // Wait for the I2C task message to arrive
         while(xQueueReceive(xI2CQueue, &xMessage, portMAX_DELAY) != pdPASS);
 
+        if (xMessage.xMessageType == I2C_SET_RELAYS)
+        {
+            Wire.beginTransmission(GPIO_EXT_ADDR);
+            Wire.write(xMessage.bMessage);
+            Wire.endTransmission(true);
+
+            wdata.relays = xMessage.bMessage;
+        }
         if (xMessage.xMessageType == I2C_READ_TEMP)
         {
             // Read temperature sensor
@@ -325,22 +326,22 @@ void setup()
     setup_sw();
 
     xTaskCreatePinnedToCore(
-        vTask_I2C,          // Task function
-        "task_i2c",         // Name of the task
-        2048,               // Stack size in bytes
-        nullptr,            // Parameter passed as input to the task
-        tskIDLE_PRIORITY,   // Priority of the task
-        nullptr,            // Task handle
-        APP_CPU);           // Core where the task should run (user program core)
+        vTask_I2C,           // Task function
+        "task_i2c",          // Name of the task
+        2048,                // Stack size in bytes
+        nullptr,             // Parameter passed as input to the task
+        tskIDLE_PRIORITY + 1,// Priority of the task
+        nullptr,             // Task handle
+        APP_CPU);            // Core where the task should run (user program core)
 
     xTaskCreatePinnedToCore(
-        vTask_read_sensors, // Task function
-        "task_sensors",     // Name of the task
-        2048,               // Stack size in bytes
-        &wdata,             // Parameter passed as input to the task
-        1,                  // Priority of the task
-        nullptr,            // Task handle
-        APP_CPU);           // Core where the task should run (user program core)
+        vTask_read_sensors,  // Task function
+        "task_sensors",      // Name of the task
+        2048,                // Stack size in bytes
+        &wdata,              // Parameter passed as input to the task
+        tskIDLE_PRIORITY,    // Priority of the task
+        nullptr,             // Task handle
+        APP_CPU);            // Core where the task should run (user program core)
 }
 
 void loop()

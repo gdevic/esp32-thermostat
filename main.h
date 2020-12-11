@@ -18,13 +18,13 @@ struct StationData
     float temp_f;       // Current temperature in "F"
     bool temp_valid;    // True if termperature reading is correct
 
-    uint32_t fan_mode;  // Fan operation mode: OFF, ON, CYC
+    uint8_t fan_mode;   // Fan operation mode: OFF, ON, CYC
 #define FAN_MODE_OFF  0
 #define FAN_MODE_ON   1
 #define FAN_MODE_CYC  2
 #define FAN_MODE_LAST FAN_MODE_CYC
 
-    uint32_t ac_mode;   // A/C mode
+    uint8_t ac_mode;    // A/C mode
 #define AC_MODE_OFF   0
 #define AC_MODE_COOL  1
 #define AC_MODE_HEAT  2
@@ -36,6 +36,7 @@ struct StationData
 
     uint32_t seconds;   // Uptime seconds counter (shown as "uptime" in web reports)
     uint32_t status;    // Bitfield containing possible errors and status bits
+    uint8_t relays { 0xFF }; // Effective state of the relay control byte
 };
 
 // Possible errors
@@ -48,7 +49,24 @@ struct StationData
 
 extern StationData wdata;
 
+// Type of a message sent to the I2C task
+typedef struct
+{
+    portBASE_TYPE xMessageType;
+    uint8_t bMessage;
+} xI2CMessage;
+
+#define I2C_READ_TEMP    0
+#define I2C_LCD_INIT     1
+#define I2C_PRINT_FAN    2
+#define I2C_PRINT_AC     3
+#define I2C_PRINT_TARGET 4
+#define I2C_SET_RELAYS   5
+
+extern QueueHandle_t xI2CQueue; // The queue of messages to the I2C task
+
 // From main.cpp
+void pref_set(const char* name, uint8_t value);
 void pref_set(const char* name, uint32_t value);
 void pref_set(const char* name, float value);
 void pref_set(const char* name, String value);
