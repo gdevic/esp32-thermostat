@@ -96,12 +96,51 @@ void handleJson(AsyncWebServerRequest *request)
     }
 }
 
+template<class T> T parse(String value, char **p_next);
+template<> inline uint32_t parse<uint32_t>(String value, char **p_next) { return strtoul(value.c_str(), p_next, 0); }
+template<> inline float parse<float>(String value, char **p_next) { return strtof(value.c_str(), p_next); }
+template<> inline String parse<String>(String value, char **p_next)
+{
+    value.trim();
+    value.replace("\"", "'"); // Disallow the quotation character to ensure valid JSON output when printed
+    return value;
+}
+
+// Parses the GET method ?name=value argument and returns false if the key or its value are not valid
+// When the key name is matched, and the value is correct, it updates the wdata reference variable and its NV value
+template <class T>
+static bool get_parse_value(AsyncWebServerRequest *request, String key_name, T& dest)
+{
+    String value = request->arg(key_name);
+    if (value.length())
+    {
+        char *p_next;
+        T n = parse<T>(value, &p_next);
+
+        // Check for validity of int and float types since we read them using strto* functions
+        bool is_string = sizeof(T) == sizeof(String); // Little trick to tell String type apart without having the RTTI support
+        if (is_string || ((p_next != value.c_str()) && (*p_next == 0) && (errno != ERANGE)))
+        {
+            dest = n; // Set the wdata.<key_name> member
+            pref_set(key_name.c_str(), n); // Set the new value into the NV variable
+            request->send(200, "text/html", "OK " + String(n));
+            return true;
+        }
+    }
+    return false;
+}
+
 // Set a variable from the client side. The key/value pairs are passed using an HTTP GET method.
 void handleSet(AsyncWebServerRequest *request)
 {
     if (xSemaphoreTake(webtext_semaphore, TickType_t(100)) == pdTRUE)
     {
-        // TODO
+        // Updating one at a time will respond with "OK" + the new value
+        bool ok = false;
+        ok |= get_parse_value(request, "id", wdata.id);
+        ok |= get_parse_value(request, "tag", wdata.tag);
+        if (!ok)
+            request->send(400, "text/html", "?");
 
         xSemaphoreGive(webtext_semaphore);
     }
