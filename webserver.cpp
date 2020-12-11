@@ -25,7 +25,7 @@ static SemaphoreHandle_t webtext_semaphore; // Semaphore guarding the access to 
 
 AsyncWebServer server(80);
 
-String get_uptime_str(uint32_t sec)
+String get_time_str(uint32_t sec)
 {
     uint32_t seconds = (sec % 60);
     uint32_t minutes = (sec % 3600) / 60;
@@ -49,7 +49,7 @@ void webserver_set_response()
     webtext_root += "\nTAG = " + wdata.tag;
     webtext_root += "\nMAC = " + wifi_mac;
     webtext_root += "\nstatus = " + String(wdata.status);
-    webtext_root += "\nuptime = " + get_uptime_str(wdata.seconds);
+    webtext_root += "\nuptime = " + get_time_str(wdata.seconds);
     webtext_root += "\nreconnects = " + String(reconnects);
     webtext_root += "\nRSSI = " + String(WiFi.RSSI()); // Signal strength
     webtext_root += "\nINT_C = " + String((temprature_sens_read() - 32) / 1.8);
@@ -64,7 +64,12 @@ void webserver_set_response()
     webtext_root += "\nac_mode = " + String(wdata.ac_mode);
     webtext_root += "\ncool_to = " + String(wdata.cool_to);
     webtext_root += "\nheat_to = " + String(wdata.heat_to);
-
+    webtext_root += "\nfilter_sec = " + String(wdata.filter_sec);
+    webtext_root += "\ncool_sec = " + String(wdata.cool_sec);
+    webtext_root += "\nheat_sec = " + String(wdata.heat_sec);
+    webtext_root += "\nfilter_hms = " + get_time_str(wdata.filter_sec);
+    webtext_root += "\ncool_hms = " + get_time_str(wdata.cool_sec);
+    webtext_root += "\nheat_hms = " + get_time_str(wdata.heat_sec);
     webtext_root += String("</pre></body></html>\n");
 
     // Format the json response
@@ -84,6 +89,9 @@ void webserver_set_response()
     webtext_json += ", \"ac_mode\":" + String(wdata.ac_mode);
     webtext_json += ", \"cool_to\":" + String(wdata.cool_to);
     webtext_json += ", \"heat_to\":" + String(wdata.heat_to);
+    webtext_json += ", \"filter_sec\":" + String(wdata.filter_sec);
+    webtext_json += ", \"cool_sec\":" + String(wdata.cool_sec);
+    webtext_json += ", \"heat_sec\":" + String(wdata.heat_sec);
     webtext_json += " }";
 
     xSemaphoreGive(webtext_semaphore);
@@ -159,6 +167,9 @@ void handleSet(AsyncWebServerRequest *request)
         bool ok = false;
         ok |= get_parse_value(request, "id", wdata.id, true);
         ok |= get_parse_value(request, "tag", wdata.tag, true);
+        ok |= get_parse_value(request, "filter_sec", wdata.filter_sec, true);
+        ok |= get_parse_value(request, "cool_sec", wdata.cool_sec, true);
+        ok |= get_parse_value(request, "heat_sec", wdata.heat_sec, true);
         ok |= get_parse_value(request, "fan_mode", u8, false);
         ok |= get_parse_value(request, "ac_mode", u8, false);
         ok |= get_parse_value(request, "cool_to", u8, false);

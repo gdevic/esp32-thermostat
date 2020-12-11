@@ -190,3 +190,20 @@ void CControl::set_heat_to(uint8_t temp)
     m_ac_counter = 30; // 30 sec to A/C mode change
     wdata.heat_to = temp;
 }
+
+// Based on the effective relay positions, add fan and A/C usage
+// Returns true if any of the counters have incremented
+bool CControl::accounting(uint8_t relays)
+{
+    bool changed = false;
+    if (~relays & PIN_MASTER) // Only if master relay is on
+    {
+        if (~relays & PIN_FAN)
+            wdata.filter_sec++, changed = true;
+        if (~relays & PIN_COOL)
+            wdata.cool_sec++, changed = true;
+        if (~relays & PIN_HEAT)
+            wdata.heat_sec++, changed = true;
+    }
+    return changed;
+}

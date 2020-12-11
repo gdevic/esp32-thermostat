@@ -8,6 +8,7 @@
 
 // Period, in seconds, to read sensors
 #define PERIOD_5_SEC  5
+#define PERIOD_60_SEC 60
 
 struct StationData
 {
@@ -35,6 +36,9 @@ struct StationData
     uint8_t heat_to;    // Temperature heating target
 
     uint32_t seconds;   // Uptime seconds counter (shown as "uptime" in web reports)
+    uint32_t filter_sec;// Total A/C + fan on time in seconds
+    uint32_t cool_sec;  // Total A/C cooling time in seconds
+    uint32_t heat_sec;  // Total A/C heating time in seconds
     uint32_t status;    // Bitfield containing possible errors and status bits
     uint8_t relays { 0xFF }; // Effective state of the relay control byte
 };

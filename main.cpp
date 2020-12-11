@@ -201,6 +201,7 @@ static void vTask_read_sensors(void *p)
     const TickType_t xFrequency = 1 * 1000 / portTICK_PERIOD_MS;
     TickType_t xLastWakeTime = xTaskGetTickCount();
     xI2CMessage xMessage;
+    bool changed = false; // Commit updates to filter counters only on change
 
     while(true)
     {
@@ -214,6 +215,20 @@ static void vTask_read_sensors(void *p)
             xMessage.xMessageType = I2C_READ_TEMP;
             xQueueSend(xI2CQueue, &xMessage, portMAX_DELAY);
         }
+
+        // Every second, add filter, cooling and heating counters
+        changed |= control.accounting(wdata.relays);
+        // Every minute, if they have changed, commit accounting values to NV
+        if (changed && ((wdata.seconds % PERIOD_60_SEC) == 0))
+        {
+            pref.begin("wd", false);
+            pref.putUInt("filter_sec", wdata.filter_sec);
+            pref.putUInt("cool_sec", wdata.cool_sec);
+            pref.putUInt("heat_sec", wdata.heat_sec);
+            pref.end();
+            changed = false;
+        }
+
         // At the end, preset various response strings that the server should give out. This will happen once a second,
         // whether we have any new data or not.
         webserver_set_response();
@@ -304,6 +319,9 @@ void setup()
     pref.begin("wd", true);
     wdata.id = pref.getString("id", "Thermostat");
     wdata.tag = pref.getString("tag", "Smart Thermostat station");
+    wdata.filter_sec = pref.getUInt("filter_sec", 0);
+    wdata.cool_sec = pref.getUInt("cool_sec", 0);
+    wdata.heat_sec = pref.getUInt("heat_sec", 0);
     pref.end();
 
     setup_wifi();
@@ -330,7 +348,7 @@ void setup()
         APP_CPU);            // Core where the task should run (user program core)
 
     // Recover controller state
-    pref.begin("wd", false);
+    pref.begin("wd", true);
     wdata.fan_mode = pref.getUChar("fan_mode", FAN_MODE_OFF);
     wdata.ac_mode = pref.getUChar("ac_mode", AC_MODE_OFF);
     wdata.cool_to = pref.getUChar("cool_to", 90);
