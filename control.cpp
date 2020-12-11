@@ -44,9 +44,9 @@ void CControl::tick()
         {
             if (m_fan_mode == FAN_MODE_OFF)
                 relays |= PIN_FAN;
-            if (m_fan_mode == FAN_MODE_ON)
+            else if (m_fan_mode == FAN_MODE_ON)
                 relays &= ~PIN_FAN;
-            if (m_fan_mode == FAN_MODE_CYC)
+            else if (m_fan_mode == FAN_MODE_CYC)
             {
                 // Turn the fan on for 15 min each hour
                 if (relays & PIN_FAN) // Fan was off
@@ -63,6 +63,53 @@ void CControl::tick()
         }
     }
 
+    if (m_ac_counter && wdata.temp_valid) // Control A/C only when temperature readings are valid
+    {
+        m_ac_counter--;
+        if (m_ac_counter == 0)
+        {
+            if (m_ac_mode == AC_MODE_OFF)
+                relays |= (PIN_COOL | PIN_HEAT);
+            else if (m_ac_mode == AC_MODE_COOL)
+            {
+                bool is_cooling = ((relays & PIN_COOL) == 0);
+
+                if (is_cooling && (wdata.temp_f < (float(wdata.cool_to) - 0.5)))
+                    relays |= PIN_COOL;
+
+                if (!is_cooling && (wdata.temp_f > (float(wdata.cool_to) + 0.5)))
+                    relays &= ~PIN_COOL;
+            }
+            else if (m_ac_mode == AC_MODE_HEAT)
+            {
+                bool is_heating = ((relays & PIN_HEAT) == 0);
+
+                if (is_heating && (wdata.temp_f > (float(wdata.heat_to) + 0.5)))
+                    relays |= PIN_HEAT;
+
+                if (!is_heating && (wdata.temp_f <  (float(wdata.heat_to) - 0.5)))
+                    relays &= ~PIN_HEAT;
+            }
+
+            // Re-evaluate temperature every 30 sec
+            m_ac_counter = 30;
+        }
+    }
+
+    // Make sure both heating and cooling are not on at the same time
+    if ((relays & (PIN_COOL | PIN_HEAT)) == 0)
+        relays |= (PIN_COOL | PIN_HEAT); // Turn off both cooling and heating in that care
+
+    // Make sure the fan is on for either heating or cooling
+    if ((relays & (PIN_COOL | PIN_HEAT)) != (PIN_COOL | PIN_HEAT))
+        relays &= ~PIN_FAN; // Turn on fan
+
+    // Turn on master relay when any other is active, or turn it off otherwise
+    if ((relays & (PIN_FAN | PIN_COOL | PIN_HEAT)) == (PIN_FAN | PIN_COOL | PIN_HEAT))
+        relays |= PIN_MASTER; // Turn off master if the other three are off (value of 1)
+    else
+        relays &= ~PIN_MASTER; // Turn on master otherwise
+
     if (relays != m_relays)
     {
         m_relays = relays;
@@ -75,7 +122,7 @@ void CControl::tick()
 void CControl::set_fan_mode(uint8_t mode)
 {
     if (mode > FAN_MODE_LAST)
-        mode = 0;
+        mode = FAN_MODE_OFF;
 
     // Set the new value into the NV variable
     pref_set("fan_mode", mode);
@@ -94,7 +141,7 @@ void CControl::set_fan_mode(uint8_t mode)
 void CControl::set_ac_mode(uint8_t mode)
 {
     if (mode > AC_MODE_LAST)
-        mode = 0;
+        mode = AC_MODE_OFF;
 
     // Set the new value into the NV variable
     pref_set("ac_mode", mode);
@@ -124,7 +171,6 @@ void CControl::set_cool_to(uint8_t temp)
 
     // Initiate A/C change
     m_ac_counter = 30; // 30 sec to A/C mode change
-    // TODO
     wdata.cool_to = temp;
 }
 
@@ -142,6 +188,5 @@ void CControl::set_heat_to(uint8_t temp)
 
     // Initiate A/C change
     m_ac_counter = 30; // 30 sec to A/C mode change
-    // TODO
     wdata.heat_to = temp;
 }
