@@ -52,6 +52,7 @@ void webserver_set_response()
     webtext_root += "\nuptime = " + get_time_str(wdata.seconds);
     webtext_root += "\nreconnects = " + String(reconnects);
     webtext_root += "\nRSSI = " + String(WiFi.RSSI()); // Signal strength
+    webtext_root += "\nGPIO23 = " + String(wdata.gpio23);
     webtext_root += "\nINT_C = " + String((temprature_sens_read() - 32) / 1.8);
     if (wdata.temp_valid) // Display the temperature value only if it is valid
     {
@@ -278,12 +279,27 @@ void setup_ota()
 
 void setup_wifi()
 {
+    // Based on the GPIO23 strap, assign the static IP address
+    // At the moment, the "production" board has GPIO23 fused with the GND, reading 0
+    //                the "development" board has GPIO23 open, reading 1
+    gpio_config_t io_conf
+    {
+        1ULL << GPIO_NUM_23,
+        GPIO_MODE_INPUT,
+        GPIO_PULLUP_ENABLE,
+        GPIO_PULLDOWN_DISABLE
+    };
+    gpio_config(&io_conf);
+    wdata.gpio23 = gpio_get_level(gpio_num_t(GPIO_NUM_23));
+
     WiFi.disconnect(true);
     WiFi.mode(WIFI_STA);
     WiFi.begin(ssid, password);
     IPAddress ip(192,168,1,40);
     IPAddress gateway(192,168,1,1);
     IPAddress subnet(255,255,255,0);
+    if (wdata.gpio23)
+        ip[3] = 41; // Assign 192.168.1.41 to the "development" board via strap
     WiFi.config(ip, gateway, subnet);
     wifi_mac = WiFi.macAddress();
 

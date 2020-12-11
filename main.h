@@ -41,6 +41,7 @@ struct StationData
     uint32_t heat_sec;  // Total A/C heating time in seconds
     uint32_t status;    // Bitfield containing possible errors and status bits
     uint8_t relays { 0xFF }; // Effective state of the relay control byte
+    bool gpio23;        // GPIO23 strap value
 };
 
 // Possible errors

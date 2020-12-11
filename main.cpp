@@ -165,7 +165,6 @@ void setup_sw()
     gpio_isr_handler_add(GPIO_INPUT_IO_2, gpio_isr_handler, (void*) BUTTON_INDEX_UP);
 }
 
-
 // Set a preference string value pairs, we are using char, int, float and string variants
 void pref_set(const char* name, uint8_t value)
 {
