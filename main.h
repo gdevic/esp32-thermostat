@@ -16,6 +16,23 @@ struct StationData
     String tag;         // [NV] Station description or a tag, held in the non-volatile memory
     float temp_c;       // Current temperature in "C"
     float temp_f;       // Current temperature in "F"
+    bool temp_valid;    // True if termperature reading is correct
+
+    uint32_t fan_mode;  // Manual fan operation mode: OFF, ON, CYC
+#define FAN_MODE_OFF  0
+#define FAN_MODE_ON   1
+#define FAN_MODE_CYC  2
+#define FAN_MODE_LAST FAN_MODE_CYC
+
+    uint32_t ac_mode;   // Manual A/C mode
+#define AC_MODE_OFF   0
+#define AC_MODE_COOL  1
+#define AC_MODE_HEAT  2
+#define AC_MODE_AUTO  3
+#define AC_MODE_LAST  AC_MODE_AUTO
+
+    float cool_to;      // Manual temperature cooling target
+    float heat_to;      // Manual temperature heating target
 
     uint32_t seconds;   // Uptime seconds counter (shown as "uptime" in web reports)
     uint32_t status;    // Bitfield containing possible errors and status bits

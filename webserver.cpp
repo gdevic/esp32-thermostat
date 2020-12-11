@@ -54,6 +54,7 @@ void webserver_set_response()
     webtext_root += "\nINT_C = " + String((temprature_sens_read() - 32) / 1.8);
     webtext_root += "\ntemp_c = " + String(wdata.temp_c);
     webtext_root += "\ntemp_f = " + String(wdata.temp_f);
+    webtext_root += "\ntemp_valid = " + String(wdata.temp_valid);
 
     webtext_root += String("</pre></body></html>\n");
 
@@ -63,13 +64,9 @@ void webserver_set_response()
     webtext_json += ", \"tag\":\"" + wdata.tag + "\"";
     webtext_json += ", \"uptime\":" + String(wdata.seconds);
     webtext_json += ", \"status\":" + String(wdata.status);
-    // When out of reset, and until the very fist time we had a chance to read sensors and calculate some meaningful
-    // values, do not attempt to return any data nodes
-    if (wdata.seconds > PERIOD_5_SEC)
-    {
-        webtext_json += ", \"temp_c\":" + String(wdata.temp_c);
-        webtext_json += ", \"temp_f\":" + String(wdata.temp_f);
-    }
+    webtext_json += ", \"temp_c\":" + String(wdata.temp_c);
+    webtext_json += ", \"temp_f\":" + String(wdata.temp_f);
+    webtext_json += ", \"temp_valid\":" + String(wdata.temp_valid);
     webtext_json += " }";
 
     xSemaphoreGive(webtext_semaphore);

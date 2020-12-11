@@ -32,9 +32,11 @@ typedef struct
     char *pcMessage;
 } xI2CMessage;
 
-#define I2C_READ_TEMP  0
-#define I2C_LCD_INIT   1
-#define I2C_PRINT_SW   2
+#define I2C_READ_TEMP    0
+#define I2C_LCD_INIT     1
+#define I2C_PRINT_FAN    2
+#define I2C_PRINT_AC     3
+#define I2C_PRINT_TARGET 4
 
 QueueHandle_t xI2CQueue; // The queue used to send messages to the I2C task
 //------------------------------------------------------------------------------------------
@@ -60,7 +62,6 @@ static void lcd_init()
     static int customCharAirInv[] = { B11111, B11111, B11111, B10010, B00101, B11111, B10010, B00101 };
     static int customCharDown[]   = { B00000, B00000, B11111, B11111, B01110, B01110, B00100, B00100 };
     static int customCharUp[]     = { B00000, B00000, B00100, B00100, B01110, B01110, B11111, B11111 };
-
 #define CHAR_AIR     0
 #define CHAR_AIR_INV 1
 #define CHAR_DOWN    2
@@ -93,32 +94,74 @@ static void lcd_init()
 #define GPIO_INPUT_PIN_SEL  ((1ULL<<GPIO_INPUT_IO_0) | (1ULL<<GPIO_INPUT_IO_1) | (1ULL<<GPIO_INPUT_IO_2))
 #define ESP_INTR_FLAG_DEFAULT 0
 static xQueueHandle gpio_evt_queue = nullptr;
-volatile int buttons[3] {};
+volatile bool buttons[3] {};
+#define BUTTON_INDEX_FAN  0
+#define BUTTON_INDEX_DOWN 1
+#define BUTTON_INDEX_UP   2
 //------------------------------------------------------------------------------------------
-static void IRAM_ATTR gpio_isr_handler(void* arg)
+static void IRAM_ATTR gpio_isr_handler(void *arg)
 {
-    uint32_t gpio_num = (uint32_t) arg;
-    xQueueSendFromISR(gpio_evt_queue, &gpio_num, nullptr);
+    uint32_t button_index = (uint32_t) arg;
+    xQueueSendFromISR(gpio_evt_queue, &button_index, nullptr);
+
+    buttons[0] = !gpio_get_level(gpio_num_t(GPIO_INPUT_IO_0));
+    buttons[1] = !gpio_get_level(gpio_num_t(GPIO_INPUT_IO_1));
+    buttons[2] = !gpio_get_level(gpio_num_t(GPIO_INPUT_IO_2));
 }
 
 static void vTask_gpio(void* arg)
 {
     xI2CMessage xMessage;
-    uint32_t io_num;
+    uint32_t button_index;
 
     while(true)
     {
-        while(xQueueReceive(gpio_evt_queue, &io_num, portMAX_DELAY) != pdPASS);
+        while(xQueueReceive(gpio_evt_queue, &button_index, portMAX_DELAY) != pdPASS);
 
-        bool level = !gpio_get_level(gpio_num_t(io_num));
+        bool level = buttons[button_index];
+
         if (level) // Consider buttons only on a button press edge
         {
-            if (io_num == GPIO_INPUT_IO_0) buttons[0] += level;
-            if (io_num == GPIO_INPUT_IO_1) buttons[1] += level;
-            if (io_num == GPIO_INPUT_IO_2) buttons[2] += level;
+            // Manual fan mode button
+            if (button_index == BUTTON_INDEX_FAN)
+            {
+                wdata.fan_mode++;
+                if (wdata.fan_mode > FAN_MODE_LAST)
+                    wdata.fan_mode = 0;
 
-            xMessage.xMessageType = I2C_PRINT_SW;
-            xQueueSend(xI2CQueue, &xMessage, portMAX_DELAY);
+                xMessage.xMessageType = I2C_PRINT_FAN;
+                xQueueSend(xI2CQueue, &xMessage, portMAX_DELAY);
+            }
+
+            // Switch heating/cooling modes by pressing both buttons at the same time
+            if (buttons[1] && buttons[2])
+            {
+                wdata.ac_mode++;
+                if (wdata.ac_mode > AC_MODE_LAST)
+                    wdata.ac_mode = 0;
+
+                xMessage.xMessageType = I2C_PRINT_AC;
+                xQueueSend(xI2CQueue, &xMessage, portMAX_DELAY);
+            }
+            else if (buttons[1] || buttons[2]) // Temperature up or down
+            {
+                bool down = (button_index == BUTTON_INDEX_DOWN);
+                bool up = (button_index == BUTTON_INDEX_UP);
+
+                if (wdata.ac_mode == AC_MODE_COOL)
+                {
+                    if (down && (wdata.cool_to > 60.0)) wdata.cool_to = wdata.cool_to - 1.0;
+                    if (up   && (wdata.cool_to < 90.0)) wdata.cool_to = wdata.cool_to + 1.0;
+                }
+                if (wdata.ac_mode == AC_MODE_HEAT)
+                {
+                    if (down && (wdata.heat_to > 60.0)) wdata.heat_to = wdata.heat_to - 1.0;
+                    if (up   && (wdata.heat_to < 90.0)) wdata.heat_to = wdata.heat_to + 1.0;
+                }
+
+                xMessage.xMessageType = I2C_PRINT_TARGET;
+                xQueueSend(xI2CQueue, &xMessage, portMAX_DELAY);
+            }
         }
     }
 }
@@ -135,23 +178,22 @@ void setup_sw()
     };
     gpio_config(&io_conf);
     // Create a queue to handle gpio events from isr
-    gpio_evt_queue = xQueueCreate(10, sizeof(uint32_t));
+    gpio_evt_queue = xQueueCreate(5, sizeof(uint32_t));
     // Start gpio task
     xTaskCreate(vTask_gpio, "task_gpio", 2048, nullptr, 10, nullptr);
     // Install gpio isr service
     gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT);
     // Hook isr handlers for specific gpio pins
-    gpio_isr_handler_add(GPIO_INPUT_IO_0, gpio_isr_handler, (void*) GPIO_INPUT_IO_0);
-    gpio_isr_handler_add(GPIO_INPUT_IO_1, gpio_isr_handler, (void*) GPIO_INPUT_IO_1);
-    gpio_isr_handler_add(GPIO_INPUT_IO_2, gpio_isr_handler, (void*) GPIO_INPUT_IO_2);
+    gpio_isr_handler_add(GPIO_INPUT_IO_0, gpio_isr_handler, (void*) BUTTON_INDEX_FAN);
+    gpio_isr_handler_add(GPIO_INPUT_IO_1, gpio_isr_handler, (void*) BUTTON_INDEX_DOWN);
+    gpio_isr_handler_add(GPIO_INPUT_IO_2, gpio_isr_handler, (void*) BUTTON_INDEX_UP);
 }
 
 
 StationData wdata = {};
 CControl control;
 CThermostat th;
-
-static Preferences pref;
+Preferences pref;
 
 // Set a preference string value pairs, we are using int, float and string variants
 void pref_set(const char* name, uint32_t value)
@@ -217,18 +259,49 @@ static void vTask_I2C(void *p)
             wdata.temp_c = sensors.getTempCByIndex(0);
             wdata.temp_f = wdata.temp_c * 9.0 / 5.0 + 32.0;
 
+            // Sanity check the temperature reading
+            wdata.temp_valid = (wdata.temp_f >= 60.0) && (wdata.temp_f <= 90.0);
+
             // Update temperature on the screen, round to the nearest
             lcd.setCursor(0, 0);
-            lcd.print(String(int(wdata.temp_f + 0.5), DEC) + " F");
+            lcd.print(String(int(wdata.temp_f + 0.5), DEC));
+            lcd.print(wdata.temp_valid ? " F" : " ?");
         }
         if (xMessage.xMessageType == I2C_LCD_INIT)
         {
             lcd_init();
         }
-        if (xMessage.xMessageType == I2C_PRINT_SW)
+        if (xMessage.xMessageType == I2C_PRINT_FAN)
         {
             lcd.setCursor(0, 1);
-            lcd.print(String(buttons[0], DEC) + "," + String(buttons[1], DEC) + "," + String(buttons[2], DEC));
+            if (wdata.fan_mode == FAN_MODE_OFF)
+                lcd.print("       ");
+            if (wdata.fan_mode == FAN_MODE_ON)
+                lcd.print("Fan ON ");
+            if (wdata.fan_mode == FAN_MODE_CYC)
+                lcd.print("Fan CYC");
+        }
+        if (xMessage.xMessageType == I2C_PRINT_AC)
+        {
+            lcd.setCursor(6, 0);
+            if (wdata.ac_mode == AC_MODE_OFF)
+                lcd.print("          ");
+            if (wdata.ac_mode == AC_MODE_COOL)
+                lcd.print(" A/C cool ");
+            if (wdata.ac_mode == AC_MODE_HEAT)
+                lcd.print(" A/C heat ");
+            if (wdata.ac_mode == AC_MODE_AUTO)
+                lcd.print(" A/C auto ");
+        }
+        if (xMessage.xMessageType == I2C_PRINT_TARGET)
+        {
+            lcd.setCursor(6, 0);
+            if (wdata.ac_mode == AC_MODE_OFF)
+                lcd.print("          ");
+            if (wdata.ac_mode == AC_MODE_COOL)
+                lcd.print("cool to " + String(wdata.cool_to));
+            if (wdata.ac_mode == AC_MODE_HEAT)
+                lcd.print("heat to " + String(wdata.heat_to));
         }
     }
 }
@@ -236,7 +309,7 @@ static void vTask_I2C(void *p)
 void setup()
 {
     // Start with some delay to buffer out quick power glitches
-    //delay(2000); // TBD
+    delay(2000);
 
     Serial.begin(115200);
 
@@ -245,6 +318,9 @@ void setup()
     wdata.id = pref.getString("id", "Thermostat");
     wdata.tag = pref.getString("tag", "Smart Thermostat station");
     pref.end();
+
+    wdata.cool_to = 90.0;
+    wdata.heat_to = 60.0;
 
     setup_wifi();
     setup_webserver();
@@ -262,7 +338,7 @@ void setup()
 
     xTaskCreatePinnedToCore(
         vTask_read_sensors, // Task function
-        "task_sensors",     // String with name of the task
+        "task_sensors",     // Name of the task
         2048,               // Stack size in bytes
         &wdata,             // Parameter passed as input to the task
         1,                  // Priority of the task
