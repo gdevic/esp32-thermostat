@@ -1,7 +1,5 @@
 #include "main.h"
 #include <Preferences.h>
-
-#include "thermostat.h"
 #include "control.h"
 
 //-------------------------------------- DS18B20 -------------------------------------------
@@ -192,7 +190,6 @@ void setup_sw()
 
 StationData wdata = {};
 CControl control;
-CThermostat th;
 Preferences pref;
 
 // Set a preference string value pairs, we are using int, float and string variants
