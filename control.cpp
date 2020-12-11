@@ -72,14 +72,13 @@ void CControl::tick()
     }
 }
 
-void CControl::set_fan_mode(uint8_t fan_mode)
+void CControl::set_fan_mode(uint8_t mode)
 {
-    if (fan_mode > FAN_MODE_LAST)
-        fan_mode = 0;
-    wdata.fan_mode = fan_mode;
+    if (mode > FAN_MODE_LAST)
+        mode = 0;
 
     // Set the new value into the NV variable
-    pref_set("fan_mode", wdata.fan_mode);
+    pref_set("fan_mode", mode);
 
     // Display the current fan mode on the LCD
     xI2CMessage xMessage;
@@ -88,5 +87,61 @@ void CControl::set_fan_mode(uint8_t fan_mode)
 
     // Initiate fan change
     m_fan_counter = 5; // 5 sec to fan change
-    m_fan_mode = fan_mode;
+    m_fan_mode = mode;
+    wdata.fan_mode = mode;
+}
+
+void CControl::set_ac_mode(uint8_t mode)
+{
+    if (mode > AC_MODE_LAST)
+        mode = 0;
+
+    // Set the new value into the NV variable
+    pref_set("ac_mode", mode);
+
+    // Display the current A/C mode on the LCD
+    xI2CMessage xMessage;
+    xMessage.xMessageType = I2C_PRINT_AC;
+    xQueueSend(xI2CQueue, &xMessage, portMAX_DELAY);
+
+    // Initiate A/C change
+    m_ac_counter = 30; // 30 sec to A/C mode change
+    m_ac_mode = mode;
+    wdata.ac_mode = mode;
+}
+
+void CControl::set_cool_to(uint8_t temp)
+{
+    temp = constrain(temp, 60, 90);
+
+    // Set the new value into the NV variable
+    pref_set("cool_to", temp);
+
+    // Display the current A/C target on the LCD
+    xI2CMessage xMessage;
+    xMessage.xMessageType = I2C_PRINT_TARGET;
+    xQueueSend(xI2CQueue, &xMessage, portMAX_DELAY);
+
+    // Initiate A/C change
+    m_ac_counter = 30; // 30 sec to A/C mode change
+    // TODO
+    wdata.cool_to = temp;
+}
+
+void CControl::set_heat_to(uint8_t temp)
+{
+    temp = constrain(temp, 60, 90);
+
+    // Set the new value into the NV variable
+    pref_set("heat_to", temp);
+
+    // Display the current A/C target on the LCD
+    xI2CMessage xMessage;
+    xMessage.xMessageType = I2C_PRINT_TARGET;
+    xQueueSend(xI2CQueue, &xMessage, portMAX_DELAY);
+
+    // Initiate A/C change
+    m_ac_counter = 30; // 30 sec to A/C mode change
+    // TODO
+    wdata.heat_to = temp;
 }

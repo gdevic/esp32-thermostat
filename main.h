@@ -28,11 +28,11 @@ struct StationData
 #define AC_MODE_OFF   0
 #define AC_MODE_COOL  1
 #define AC_MODE_HEAT  2
-#define AC_MODE_AUTO  3
-#define AC_MODE_LAST  AC_MODE_AUTO
+#define AC_MODE_AUTO  3 // TODO
+#define AC_MODE_LAST  AC_MODE_HEAT
 
-    float cool_to;      // Temperature cooling target
-    float heat_to;      // Temperature heating target
+    uint8_t cool_to;    // Temperature cooling target
+    uint8_t heat_to;    // Temperature heating target
 
     uint32_t seconds;   // Uptime seconds counter (shown as "uptime" in web reports)
     uint32_t status;    // Bitfield containing possible errors and status bits

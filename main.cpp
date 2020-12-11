@@ -52,17 +52,14 @@ static void lcd_init()
 
     // Custom char generator: https://maxpromer.github.io/LCD-Character-Creator
     static int customCharAir[]    = { B00000, B00000, B00000, B01101, B11010, B00000, B01101, B11010 };
-    static int customCharAirInv[] = { B11111, B11111, B11111, B10010, B00101, B11111, B10010, B00101 };
     static int customCharDown[]   = { B00000, B00000, B11111, B11111, B01110, B01110, B00100, B00100 };
     static int customCharUp[]     = { B00000, B00000, B00100, B00100, B01110, B01110, B11111, B11111 };
 #define CHAR_AIR     0
-#define CHAR_AIR_INV 1
-#define CHAR_DOWN    2
-#define CHAR_UP      3
+#define CHAR_DOWN    1
+#define CHAR_UP      2
 
     lcd.begin(16, 2);
     lcd.createChar(CHAR_AIR, customCharAir);
-    lcd.createChar(CHAR_AIR_INV, customCharAirInv);
     lcd.createChar(CHAR_DOWN, customCharDown);
     lcd.createChar(CHAR_UP, customCharUp);
 
@@ -118,37 +115,28 @@ static void vTask_gpio(void* arg)
             // Manual fan mode button
             if (button_index == BUTTON_INDEX_FAN)
             {
-                control.set_fan_mode(wdata.fan_mode + 1); // control class with wrap the value back to 0
+                control.set_fan_mode(wdata.fan_mode + 1);
             }
 
             // Switch heating/cooling modes by pressing both buttons at the same time
             if (buttons[1] && buttons[2])
             {
-                wdata.ac_mode++;
-                if (wdata.ac_mode > AC_MODE_LAST)
-                    wdata.ac_mode = 0;
-
-                xMessage.xMessageType = I2C_PRINT_AC;
-                xQueueSend(xI2CQueue, &xMessage, portMAX_DELAY);
+                control.set_ac_mode(wdata.ac_mode + 1);
             }
-            else if (buttons[1] || buttons[2]) // Temperature up or down
+            else if (buttons[1] || buttons[2]) // Otherwise, temperature up or down
             {
-                bool down = (button_index == BUTTON_INDEX_DOWN);
-                bool up = (button_index == BUTTON_INDEX_UP);
-
+                int delta = (button_index == BUTTON_INDEX_UP) ? +1 : -1;
                 if (wdata.ac_mode == AC_MODE_COOL)
-                {
-                    if (down && (wdata.cool_to > 60.0)) wdata.cool_to = wdata.cool_to - 1.0;
-                    if (up   && (wdata.cool_to < 90.0)) wdata.cool_to = wdata.cool_to + 1.0;
-                }
+                    control.set_cool_to(wdata.cool_to + delta);
                 if (wdata.ac_mode == AC_MODE_HEAT)
+                    control.set_heat_to(wdata.heat_to + delta);
+                if (wdata.ac_mode == AC_MODE_AUTO)
                 {
-                    if (down && (wdata.heat_to > 60.0)) wdata.heat_to = wdata.heat_to - 1.0;
-                    if (up   && (wdata.heat_to < 90.0)) wdata.heat_to = wdata.heat_to + 1.0;
+                    // Display the current A/C target on the LCD
+                    xI2CMessage xMessage;
+                    xMessage.xMessageType = I2C_PRINT_TARGET;
+                    xQueueSend(xI2CQueue, &xMessage, portMAX_DELAY);
                 }
-
-                xMessage.xMessageType = I2C_PRINT_TARGET;
-                xQueueSend(xI2CQueue, &xMessage, portMAX_DELAY);
             }
         }
     }
@@ -300,6 +288,8 @@ static void vTask_I2C(void *p)
                 lcd.print("cool to " + String(wdata.cool_to));
             if (wdata.ac_mode == AC_MODE_HEAT)
                 lcd.print("heat to " + String(wdata.heat_to));
+            if (wdata.ac_mode == AC_MODE_AUTO)
+                lcd.print("auto " + String(wdata.cool_to) + "/" + String(wdata.heat_to));
         }
     }
 }
@@ -315,9 +305,6 @@ void setup()
     wdata.id = pref.getString("id", "Thermostat");
     wdata.tag = pref.getString("tag", "Smart Thermostat station");
     pref.end();
-
-    wdata.cool_to = 90.0;
-    wdata.heat_to = 60.0;
 
     setup_wifi();
     setup_webserver();
@@ -342,12 +329,20 @@ void setup()
         nullptr,             // Task handle
         APP_CPU);            // Core where the task should run (user program core)
 
-    delay(1000); // Give a second for all the tasks to start
-
     // Recover controller state
     pref.begin("wd", false);
-    control.set_fan_mode(pref.getUChar("fan_mode", FAN_MODE_OFF));
+    wdata.fan_mode = pref.getUChar("fan_mode", FAN_MODE_OFF);
+    wdata.ac_mode = pref.getUChar("ac_mode", AC_MODE_OFF);
+    wdata.cool_to = pref.getUChar("cool_to", 90);
+    wdata.heat_to = pref.getUChar("heat_to", 60);
     pref.end();
+
+    delay(1000); // Give a second for all the tasks to start
+
+    control.set_fan_mode(wdata.fan_mode);
+    control.set_ac_mode(wdata.ac_mode);
+    control.set_cool_to(wdata.cool_to);
+    control.set_heat_to(wdata.heat_to);
 }
 
 void loop()
