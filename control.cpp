@@ -63,7 +63,7 @@ void CControl::tick()
         }
     }
 
-    if (m_ac_counter && wdata.temp_valid) // Control A/C only when temperature readings are valid
+    if (m_ac_counter && wdata.temp_valid) // Control A/C only when the temperature readings are valid
     {
         m_ac_counter--;
         if (m_ac_counter == 0)
@@ -98,7 +98,7 @@ void CControl::tick()
 
     // Make sure both heating and cooling are not on at the same time
     if ((relays & (PIN_COOL | PIN_HEAT)) == 0)
-        relays |= (PIN_COOL | PIN_HEAT); // Turn off both cooling and heating in that care
+        relays |= (PIN_COOL | PIN_HEAT); // Turn off both cooling and heating in that case
 
     // Make sure the fan is on for either heating or cooling
     if ((relays & (PIN_COOL | PIN_HEAT)) != (PIN_COOL | PIN_HEAT))
@@ -106,7 +106,7 @@ void CControl::tick()
 
     // Turn on master relay when any other is active, or turn it off otherwise
     if ((relays & (PIN_FAN | PIN_COOL | PIN_HEAT)) == (PIN_FAN | PIN_COOL | PIN_HEAT))
-        relays |= PIN_MASTER; // Turn off master if the other three are off (value of 1)
+        relays |= PIN_MASTER; // Turn off master if the other three relays are also off
     else
         relays &= ~PIN_MASTER; // Turn on master otherwise
 
@@ -124,7 +124,7 @@ void CControl::set_fan_mode(uint8_t mode)
     if (mode > FAN_MODE_LAST)
         mode = FAN_MODE_OFF;
 
-    // Set the new value into the NV variable
+    // Set the new value into an NV variable
     pref_set("fan_mode", mode);
 
     // Display the current fan mode on the LCD
@@ -143,7 +143,7 @@ void CControl::set_ac_mode(uint8_t mode)
     if (mode > AC_MODE_LAST)
         mode = AC_MODE_OFF;
 
-    // Set the new value into the NV variable
+    // Set the new value into an NV variable
     pref_set("ac_mode", mode);
 
     // Display the current A/C mode on the LCD
@@ -161,7 +161,7 @@ void CControl::set_cool_to(uint8_t temp)
 {
     temp = constrain(temp, 60, 90);
 
-    // Set the new value into the NV variable
+    // Set the new value into an NV variable
     pref_set("cool_to", temp);
 
     // Display the current A/C target on the LCD
@@ -178,7 +178,7 @@ void CControl::set_heat_to(uint8_t temp)
 {
     temp = constrain(temp, 60, 90);
 
-    // Set the new value into the NV variable
+    // Set the new value into an NV variable
     pref_set("heat_to", temp);
 
     // Display the current A/C target on the LCD
@@ -191,12 +191,12 @@ void CControl::set_heat_to(uint8_t temp)
     wdata.heat_to = temp;
 }
 
-// Based on the effective relay positions, add fan and A/C usage
+// Based on the effective relay configuration, add fan and A/C usage
 // Returns true if any of the counters have incremented
 bool CControl::accounting(uint8_t relays)
 {
     bool changed = false;
-    if (~relays & PIN_MASTER) // Only if master relay is on
+    if (~relays & PIN_MASTER) // Do accounting only if the master relay is on
     {
         if (~relays & PIN_FAN)
             wdata.filter_sec++, changed = true;

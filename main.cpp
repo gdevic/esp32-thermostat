@@ -70,6 +70,9 @@ static void lcd_init()
     lcd.clear();
     lcd.setBacklight(1);
 
+    lcd.setCursor(0, 0);
+    lcd.print("Init");
+
     lcd.setCursor(9, 1);
     lcd.write(uint8_t(CHAR_AIR)); // FAN
 }
@@ -85,7 +88,7 @@ static void lcd_init()
 #define GPIO_INPUT_PIN_SEL  ((1ULL<<GPIO_INPUT_IO_0) | (1ULL<<GPIO_INPUT_IO_1) | (1ULL<<GPIO_INPUT_IO_2))
 #define ESP_INTR_FLAG_DEFAULT 0
 static xQueueHandle gpio_evt_queue = nullptr;
-volatile bool buttons[3] {};
+static bool buttons[3] {};
 #define BUTTON_INDEX_FAN  0
 #define BUTTON_INDEX_DOWN 1
 #define BUTTON_INDEX_UP   2
@@ -111,7 +114,7 @@ static void vTask_gpio(void* arg)
 
         bool level = buttons[button_index];
 
-        if (level) // Consider buttons only on a button press edge
+        if (level) // Consider buttons only on a button press transition
         {
             // Manual fan mode button
             if (button_index == BUTTON_INDEX_FAN)
@@ -141,26 +144,25 @@ static void vTask_gpio(void* arg)
             }
 #endif
 #if UI == 2
-            // Pressing "C" or "down" in AC mode off enters cooling mode
-            if ((wdata.ac_mode == AC_MODE_OFF) && buttons[1])
+            // Pressing "C" or "down" in AC mode off enters the cooling mode
+            if ((wdata.ac_mode == AC_MODE_OFF) && buttons[BUTTON_INDEX_DOWN])
             {
                 control.set_cool_to(wdata.temp_f + 0.5);
                 control.set_ac_mode(AC_MODE_COOL);
             }
-            // Pressing "H" or "up" in AC mode off enters heating mode
-            else if ((wdata.ac_mode == AC_MODE_OFF) && buttons[2])
+            // Pressing "H" or "up" in AC mode off enters the heating mode
+            else if ((wdata.ac_mode == AC_MODE_OFF) && buttons[BUTTON_INDEX_UP])
             {
                 control.set_heat_to(wdata.temp_f - 0.5);
                 control.set_ac_mode(AC_MODE_HEAT);
             }
-            // In cooling mode, selecting too high a temperature, turns the cooling off
-            else if ((wdata.ac_mode == AC_MODE_COOL) && ((wdata.temp_f + 4.5) <= wdata.cool_to) && buttons[2])
+            // In cooling mode, selecting too high a temperature turns the cooling off
+            else if ((wdata.ac_mode == AC_MODE_COOL) && ((wdata.temp_f + 4.5) <= wdata.cool_to) && buttons[BUTTON_INDEX_UP])
                 control.set_ac_mode(AC_MODE_OFF);
-            // In heating mode, selecting too low a temperature, turns the heating off
-            else if ((wdata.ac_mode == AC_MODE_HEAT) && ((wdata.temp_f - 4.5) >= wdata.heat_to) && buttons[1])
+            // In heating mode, selecting too low a temperature turns the heating off
+            else if ((wdata.ac_mode == AC_MODE_HEAT) && ((wdata.temp_f - 4.5) >= wdata.heat_to) && buttons[BUTTON_INDEX_DOWN])
                 control.set_ac_mode(AC_MODE_OFF);
-            // Otherwise, adjust the target temperature
-            else
+            else // Otherwise, adjust the target temperature up or down
             {
                 int delta = (button_index == BUTTON_INDEX_UP) ? +1 : -1;
                 if (wdata.ac_mode == AC_MODE_COOL)
@@ -240,16 +242,16 @@ static void vTask_read_sensors(void *p)
         wdata.seconds++;
 
         // Once every 5 seconds, read temperature sensor
-        if ((wdata.seconds % PERIOD_5_SEC) == 0)
+        if ((wdata.seconds % 5) == 0)
         {
             xMessage.xMessageType = I2C_READ_TEMP;
             xQueueSend(xI2CQueue, &xMessage, portMAX_DELAY);
         }
 
-        // Every second, add filter, cooling and heating counters
+        // Every second, add up filter, cooling and heating periods
         changed |= control.accounting(wdata.relays);
-        // Every minute, if they have changed, commit accounting values to NV
-        if (changed && ((wdata.seconds % PERIOD_60_SEC) == 0))
+        // Once a minute, if changed, commit those accounting values to NV
+        if (changed && ((wdata.seconds % 60) == 0))
         {
             pref.begin("wd", false);
             pref.putUInt("filter_sec", wdata.filter_sec);
@@ -346,9 +348,7 @@ static void vTask_I2C(void *p)
 
 void setup()
 {
-    delay(2000); // Start with some delay to buffer out quick power glitches
-
-    Serial.begin(115200);
+    delay(2000); // Start with some delay to sleep over any quick power glitches
 
     // Read the initial values stored in the NVM
     pref.begin("wd", true);

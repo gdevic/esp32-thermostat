@@ -3,13 +3,6 @@
 // The version string shown in stats. Nothing depends on it and it is used only to confirm newly flashed firmware.
 #define FIRMWARE_VERSION "1.00"
 
-// To simply test the code, define TEST
-//#define TEST
-
-// Period, in seconds, to read sensors
-#define PERIOD_5_SEC  5
-#define PERIOD_60_SEC 60
-
 struct StationData
 {
     // Variables marked with [NV] are held in the non-volatile memory using Preferences
@@ -25,34 +18,33 @@ struct StationData
 #define FAN_MODE_CYC  2
 #define FAN_MODE_LAST FAN_MODE_CYC
 
-    uint8_t ac_mode;    // A/C mode
+    uint8_t ac_mode;    // [NV] A/C mode
 #define AC_MODE_OFF   0
 #define AC_MODE_COOL  1
 #define AC_MODE_HEAT  2
 #define AC_MODE_AUTO  3 // TODO
 #define AC_MODE_LAST  AC_MODE_HEAT
 
-    uint8_t cool_to;    // Temperature cooling target
-    uint8_t heat_to;    // Temperature heating target
+    uint8_t cool_to;    // [NV] Temperature cooling target
+    uint8_t heat_to;    // [NV] Temperature heating target
 
     uint32_t seconds;   // Uptime seconds counter (shown as "uptime" in web reports)
-    uint32_t filter_sec;// Total A/C + fan on time in seconds
-    uint32_t cool_sec;  // Total A/C cooling time in seconds
-    uint32_t heat_sec;  // Total A/C heating time in seconds
+    uint32_t filter_sec;// [NV] Total A/C + fan on time in seconds
+    uint32_t cool_sec;  // [NV] Total A/C cooling time in seconds
+    uint32_t heat_sec;  // [NV] Total A/C heating time in seconds
     uint32_t status;    // Bitfield containing possible errors and status bits
     uint8_t relays { 0xFF }; // Effective state of the relay control byte
     bool gpio23;        // GPIO23 strap value
 };
 
+extern StationData wdata;
+
 // Possible errors
 #define STATUS_LCD_INIT_ERROR   0x0001 // LCD was not able to initialize
 
-// Specific to ESP32's FreeRTOS port
-// Arduino loop is running on core 1 and priority 1, https://techtutorialsx.com/2017/05/09/esp32-running-code-on-a-specific-core
+// Specific to ESP32's FreeRTOS port, Arduino loop is running on core 1 and priority 1
 #define PRO_CPU 0
 #define APP_CPU 1
-
-extern StationData wdata;
 
 // Type of a message sent to the I2C task
 typedef struct

@@ -150,7 +150,7 @@ static bool get_parse_value(AsyncWebServerRequest *request, String key_name, T& 
         {
             dest = n; // Set the wdata.<key_name> member
             if (save_nv)
-                pref_set(key_name.c_str(), n); // Set the new value into the NV variable
+                pref_set(key_name.c_str(), n); // Set the new value into an NV variable
             request->send(200, "text/html", "OK " + String(n));
             return true;
         }
@@ -164,7 +164,7 @@ void handleSet(AsyncWebServerRequest *request)
     if (xSemaphoreTake(webtext_semaphore, TickType_t(100)) == pdTRUE)
     {
         uint8_t u8;
-        // Updating one at a time will respond with "OK" + the new value
+        // Updating one at a time will respond with "OK" followed by the new value
         bool ok = false;
         ok |= get_parse_value(request, "id", wdata.id, true);
         ok |= get_parse_value(request, "tag", wdata.tag, true);
@@ -280,7 +280,7 @@ void setup_ota()
 void setup_wifi()
 {
     // Based on the GPIO23 strap, assign the static IP address
-    // At the moment, the "production" board has GPIO23 fused with the GND, reading 0
+    // At the moment, the "production" board has GPIO23 fused with GND, reading 0
     //                the "development" board has GPIO23 open, reading 1
     gpio_config_t io_conf
     {
