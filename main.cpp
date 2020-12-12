@@ -2,6 +2,11 @@
 #include <Preferences.h>
 #include "control.h"
 
+// Implemented are 2 UIs:
+// 1 - Mode change by pressing both up/down
+// 2 - Mode change by stepping several degrees from the current temp
+#define UI  2
+
 StationData wdata = {};
 CControl control;
 Preferences pref;
@@ -29,6 +34,14 @@ DallasTemperature sensors(&oneWire);
 #include <Wire.h>
 LiquidCrystal_PCF8574 lcd(0x27); // Set the I2C LCD address
 
+// Custom char generator: https://maxpromer.github.io/LCD-Character-Creator
+static int customCharAir[]    = { B00000, B00000, B00000, B01101, B11010, B00000, B01101, B11010 };
+static int customCharDown[]   = { B00000, B00000, B11111, B11111, B01110, B01110, B00100, B00100 };
+static int customCharUp[]     = { B00000, B00000, B00100, B00100, B01110, B01110, B11111, B11111 };
+#define CHAR_AIR     0
+#define CHAR_DOWN    1
+#define CHAR_UP      2
+
 // The maximum number of messages that can be waiting for I2C task at any one time
 #define I2C_QUEUE_SIZE 5
 QueueHandle_t xI2CQueue; // The queue used to send messages to the I2C task
@@ -50,27 +63,15 @@ static void lcd_init()
     if (Wire.endTransmission(true))
         wdata.status |= STATUS_LCD_INIT_ERROR;
 
-    // Custom char generator: https://maxpromer.github.io/LCD-Character-Creator
-    static int customCharAir[]    = { B00000, B00000, B00000, B01101, B11010, B00000, B01101, B11010 };
-    static int customCharDown[]   = { B00000, B00000, B11111, B11111, B01110, B01110, B00100, B00100 };
-    static int customCharUp[]     = { B00000, B00000, B00100, B00100, B01110, B01110, B11111, B11111 };
-#define CHAR_AIR     0
-#define CHAR_DOWN    1
-#define CHAR_UP      2
-
     lcd.begin(16, 2);
     lcd.createChar(CHAR_AIR, customCharAir);
     lcd.createChar(CHAR_DOWN, customCharDown);
     lcd.createChar(CHAR_UP, customCharUp);
-
     lcd.clear();
     lcd.setBacklight(1);
+
     lcd.setCursor(9, 1);
     lcd.write(uint8_t(CHAR_AIR)); // FAN
-    lcd.setCursor(12, 1);
-    lcd.write(uint8_t(CHAR_DOWN)); // TEMP DOWN
-    lcd.setCursor(15, 1);
-    lcd.write(uint8_t(CHAR_UP)); // TEMP UP
 }
 
 //-------------------------------------- BUTTONS -------------------------------------------
@@ -117,7 +118,7 @@ static void vTask_gpio(void* arg)
             {
                 control.set_fan_mode(wdata.fan_mode + 1);
             }
-
+#if UI == 1
             // Switch heating/cooling modes by pressing both buttons at the same time
             if (buttons[1] && buttons[2])
             {
@@ -138,6 +139,36 @@ static void vTask_gpio(void* arg)
                     xQueueSend(xI2CQueue, &xMessage, portMAX_DELAY);
                 }
             }
+#endif
+#if UI == 2
+            // Pressing "C" or "down" in AC mode off enters cooling mode
+            if ((wdata.ac_mode == AC_MODE_OFF) && buttons[1])
+            {
+                control.set_cool_to(wdata.temp_f + 0.5);
+                control.set_ac_mode(AC_MODE_COOL);
+            }
+            // Pressing "H" or "up" in AC mode off enters heating mode
+            else if ((wdata.ac_mode == AC_MODE_OFF) && buttons[2])
+            {
+                control.set_heat_to(wdata.temp_f - 0.5);
+                control.set_ac_mode(AC_MODE_HEAT);
+            }
+            // In cooling mode, selecting too high a temperature, turns the cooling off
+            else if ((wdata.ac_mode == AC_MODE_COOL) && ((wdata.temp_f + 4.5) <= wdata.cool_to) && buttons[2])
+                control.set_ac_mode(AC_MODE_OFF);
+            // In heating mode, selecting too low a temperature, turns the heating off
+            else if ((wdata.ac_mode == AC_MODE_HEAT) && ((wdata.temp_f - 4.5) >= wdata.heat_to) && buttons[1])
+                control.set_ac_mode(AC_MODE_OFF);
+            // Otherwise, adjust the target temperature
+            else
+            {
+                int delta = (button_index == BUTTON_INDEX_UP) ? +1 : -1;
+                if (wdata.ac_mode == AC_MODE_COOL)
+                    control.set_cool_to(wdata.cool_to + delta);
+                if (wdata.ac_mode == AC_MODE_HEAT)
+                    control.set_heat_to(wdata.heat_to + delta);
+            }
+#endif
         }
     }
 }
@@ -292,6 +323,11 @@ static void vTask_I2C(void *p)
                 lcd.print(" A/C heat ");
             if (wdata.ac_mode == AC_MODE_AUTO)
                 lcd.print(" A/C auto ");
+
+            lcd.setCursor(12, 1);
+            lcd.write((wdata.ac_mode == AC_MODE_OFF) ? 'C' : uint8_t(CHAR_DOWN));
+            lcd.setCursor(15, 1);
+            lcd.write((wdata.ac_mode == AC_MODE_OFF) ? 'H' : uint8_t(CHAR_UP));
         }
         if (xMessage.xMessageType == I2C_PRINT_TARGET)
         {
