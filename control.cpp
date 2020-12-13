@@ -1,12 +1,6 @@
 #include "control.h"
 #include "main.h"
 
-// Define function on the PCF8574 gpio pins
-#define PIN_FAN     (1 << 0)
-#define PIN_COOL    (1 << 1)
-#define PIN_HEAT    (1 << 2)
-#define PIN_MASTER  (1 << 3)
-
 static void vTask_control(void *p)
 {
     // Make this task sleep and awake once a second
@@ -100,19 +94,19 @@ void CControl::tick()
     if ((relays & (PIN_COOL | PIN_HEAT)) == 0)
         relays |= (PIN_COOL | PIN_HEAT); // Turn off both cooling and heating in that case
 
-    // Make sure the fan is on for either heating or cooling
-    if ((relays & (PIN_COOL | PIN_HEAT)) != (PIN_COOL | PIN_HEAT))
-        relays &= ~PIN_FAN; // Turn on fan
-
-    // Turn on master relay when any other is active, or turn it off otherwise
-    if ((relays & (PIN_FAN | PIN_COOL | PIN_HEAT)) == (PIN_FAN | PIN_COOL | PIN_HEAT))
-        relays |= PIN_MASTER; // Turn off master if the other three relays are also off
-    else
-        relays &= ~PIN_MASTER; // Turn on master otherwise
-
     if (relays != m_relays)
     {
         m_relays = relays;
+
+        // Make sure the fan is on for either heating or cooling
+        if ((relays & (PIN_COOL | PIN_HEAT)) != (PIN_COOL | PIN_HEAT))
+            relays &= ~PIN_FAN; // Turn on fan
+
+        // Turn on master relay when any other is active, or turn it off otherwise
+        if ((relays & (PIN_FAN | PIN_COOL | PIN_HEAT)) == (PIN_FAN | PIN_COOL | PIN_HEAT))
+            relays |= PIN_MASTER; // Turn off master if the other three relays are also off
+        else
+            relays &= ~PIN_MASTER; // Turn on master otherwise
 
         xI2CMessage xMessage { I2C_SET_RELAYS, relays };
         xQueueSend(xI2CQueue, &xMessage, portMAX_DELAY);
@@ -206,4 +200,22 @@ bool CControl::accounting(uint8_t relays)
             wdata.heat_sec++, changed = true;
     }
     return changed;
+}
+
+// Implements a simple temperature model to test the thermostat
+// Called every 5 sec when USE_MODEL is 1
+float CControl::model_get_temperature()
+{
+    // Room is naturally getting cooler or hotter
+    m_tcurrent += m_tdambience;
+
+    if ((~wdata.relays & PIN_MASTER) && (~wdata.relays & PIN_HEAT))
+    {
+        m_tcurrent += m_tdheating;
+    }
+    if ((~wdata.relays & PIN_MASTER) && (~wdata.relays & PIN_COOL))
+    {
+        m_tcurrent -= m_tdcooling;
+    }
+    return (m_tcurrent - 32.0) * (5.0/9.0); // Return temperature in C
 }

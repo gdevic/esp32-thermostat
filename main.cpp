@@ -123,7 +123,7 @@ static void vTask_gpio(void* arg)
             }
 #if UI == 1
             // Switch heating/cooling modes by pressing both buttons at the same time
-            if (buttons[1] && buttons[2])
+            else if (buttons[1] && buttons[2])
             {
                 control.set_ac_mode(wdata.ac_mode + 1);
             }
@@ -145,7 +145,7 @@ static void vTask_gpio(void* arg)
 #endif
 #if UI == 2
             // Pressing "C" or "down" in AC mode off enters the cooling mode
-            if ((wdata.ac_mode == AC_MODE_OFF) && buttons[BUTTON_INDEX_DOWN])
+            else if ((wdata.ac_mode == AC_MODE_OFF) && buttons[BUTTON_INDEX_DOWN])
             {
                 control.set_cool_to(wdata.temp_f + 0.5);
                 control.set_ac_mode(AC_MODE_COOL);
@@ -290,6 +290,9 @@ static void vTask_I2C(void *p)
             // Read temperature sensor
             sensors.requestTemperatures();
             wdata.temp_c = sensors.getTempCByIndex(0);
+#if USE_MODEL
+            wdata.temp_c = control.model_get_temperature();
+#endif
             wdata.temp_f = wdata.temp_c * 9.0 / 5.0 + 32.0;
 
             // Sanity check the temperature reading

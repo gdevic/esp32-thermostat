@@ -3,6 +3,9 @@
 // The version string shown in stats. Nothing depends on it and it is used only to confirm newly flashed firmware.
 #define FIRMWARE_VERSION "1.00"
 
+// Set to 1 to use temperature model for testing (insted of the real temperature value)
+#define USE_MODEL 0
+
 struct StationData
 {
     // Variables marked with [NV] are held in the non-volatile memory using Preferences

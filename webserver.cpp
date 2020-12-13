@@ -61,6 +61,10 @@ void webserver_set_response()
     }
     webtext_root += "\ntemp_valid = " + String(wdata.temp_valid);
     webtext_root += "\nrelays = " + String(wdata.relays);
+    webtext_root += "\nfan_on = " + String(!!(~wdata.relays & PIN_FAN));
+    webtext_root += "\ncool_on = " + String(!!(~wdata.relays & PIN_COOL));
+    webtext_root += "\nheat_on = " + String(!!(~wdata.relays & PIN_HEAT));
+    webtext_root += "\nmaster_on = " + String(!!(~wdata.relays & PIN_MASTER));
     webtext_root += "\nfan_mode = " + String(wdata.fan_mode);
     webtext_root += "\nac_mode = " + String(wdata.ac_mode);
     webtext_root += "\ncool_to = " + String(wdata.cool_to);
@@ -86,6 +90,10 @@ void webserver_set_response()
     }
     webtext_json += ", \"temp_valid\":" + String(wdata.temp_valid);
     webtext_json += ", \"relays\":" + String(wdata.relays);
+    webtext_json += ", \"fan_on\":" + String(!!(~wdata.relays & PIN_FAN));
+    webtext_json += ", \"cool_on\":" + String(!!(~wdata.relays & PIN_COOL));
+    webtext_json += ", \"heat_on\":" + String(!!(~wdata.relays & PIN_HEAT));
+    webtext_json += ", \"master_on\":" + String(!!(~wdata.relays & PIN_MASTER));
     webtext_json += ", \"fan_mode\":" + String(wdata.fan_mode);
     webtext_json += ", \"ac_mode\":" + String(wdata.ac_mode);
     webtext_json += ", \"cool_to\":" + String(wdata.cool_to);
