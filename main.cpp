@@ -301,11 +301,11 @@ static void vTask_I2C(void *p)
             lcd.setCursor(0, 1);
             if (wdata.fan_mode == FAN_MODE_OFF)
                 lcd.print("       "), also_display_target = true;
-            if (wdata.fan_mode == FAN_MODE_ON)
+            else if (wdata.fan_mode == FAN_MODE_ON)
                 lcd.print("Fan ON ");
-            if (wdata.fan_mode == FAN_MODE_CYC)
+            else if (wdata.fan_mode == FAN_MODE_CYC)
                 lcd.print("Fan CYC");
-            if (wdata.fan_mode == FAN_MODE_AUX)
+            else if (wdata.fan_mode == FAN_MODE_AUX)
                 lcd.print("Mode ? "), also_display_ac = true;
         }
         if ((xMessage.xMessageType == I2C_PRINT_AC) || also_display_ac)
@@ -313,11 +313,11 @@ static void vTask_I2C(void *p)
             lcd.setCursor(6, 0);
             if (wdata.ac_mode == AC_MODE_OFF)
                 lcd.print("      off ");
-            if (wdata.ac_mode == AC_MODE_COOL)
+            else if (wdata.ac_mode == AC_MODE_COOL)
                 lcd.print(" A/C cool ");
-            if (wdata.ac_mode == AC_MODE_HEAT)
+            else if (wdata.ac_mode == AC_MODE_HEAT)
                 lcd.print(" A/C heat ");
-            if (wdata.ac_mode == AC_MODE_AUTO)
+            else if (wdata.ac_mode == AC_MODE_AUTO)
                 lcd.print(" A/C auto ");
         }
         if ((xMessage.xMessageType == I2C_PRINT_TARGET) || also_display_target)
@@ -325,11 +325,11 @@ static void vTask_I2C(void *p)
             lcd.setCursor(6, 0);
             if (wdata.ac_mode == AC_MODE_OFF)
                 lcd.print("          ");
-            if (wdata.ac_mode == AC_MODE_COOL)
+            else if (wdata.ac_mode == AC_MODE_COOL)
                 lcd.print("cool to " + String(wdata.cool_to));
-            if (wdata.ac_mode == AC_MODE_HEAT)
+            else if (wdata.ac_mode == AC_MODE_HEAT)
                 lcd.print("heat to " + String(wdata.heat_to));
-            if (wdata.ac_mode == AC_MODE_AUTO)
+            else if (wdata.ac_mode == AC_MODE_AUTO)
                 lcd.print("auto " + String(wdata.cool_to) + "/" + String(wdata.heat_to));
         }
     }
