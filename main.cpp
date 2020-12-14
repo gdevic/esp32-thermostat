@@ -2,11 +2,6 @@
 #include <Preferences.h>
 #include "control.h"
 
-// Implemented are 2 UIs:
-// 1 - Mode change by pressing both up/down
-// 2 - Mode change by stepping several degrees from the current temp
-#define UI  2
-
 StationData wdata = {};
 CControl control;
 Preferences pref;
@@ -74,7 +69,11 @@ static void lcd_init()
     lcd.print("Init");
 
     lcd.setCursor(9, 1);
-    lcd.write(uint8_t(CHAR_AIR)); // FAN
+    lcd.write(uint8_t(CHAR_AIR));
+    lcd.setCursor(12, 1);
+    lcd.write(uint8_t(CHAR_DOWN));
+    lcd.setCursor(15, 1);
+    lcd.write(uint8_t(CHAR_UP));
 }
 
 //-------------------------------------- BUTTONS -------------------------------------------
@@ -89,6 +88,7 @@ static void lcd_init()
 #define ESP_INTR_FLAG_DEFAULT 0
 static xQueueHandle gpio_evt_queue = nullptr;
 static bool buttons[3] {};
+static uint32_t aux_mode_counter {}; // Seconds to switch off from the FAN_MODE_AUX mode
 #define BUTTON_INDEX_FAN  0
 #define BUTTON_INDEX_DOWN 1
 #define BUTTON_INDEX_UP   2
@@ -120,57 +120,32 @@ static void vTask_gpio(void* arg)
             if (button_index == BUTTON_INDEX_FAN)
             {
                 control.set_fan_mode(wdata.fan_mode + 1);
+                aux_mode_counter = (wdata.fan_mode == FAN_MODE_AUX) ? 7 : 0;
             }
-#if UI == 1
-            // Switch heating/cooling modes by pressing both buttons at the same time
-            else if (buttons[1] && buttons[2])
+            else // When the fan mode is AUX, up or down buttons change the A/C mode
+            if (wdata.fan_mode == FAN_MODE_AUX)
             {
                 control.set_ac_mode(wdata.ac_mode + 1);
+                aux_mode_counter = 7;
             }
-            else if (buttons[1] || buttons[2]) // Otherwise, temperature up or down
+            else // When the fan mode is not AUX, up or down buttons, as expected, change the temperature
             {
-                int delta = (button_index == BUTTON_INDEX_UP) ? +1 : -1;
-                if (wdata.ac_mode == AC_MODE_COOL)
-                    control.set_cool_to(wdata.cool_to + delta);
-                if (wdata.ac_mode == AC_MODE_HEAT)
-                    control.set_heat_to(wdata.heat_to + delta);
-                if (wdata.ac_mode == AC_MODE_AUTO)
+                if (buttons[1] || buttons[2]) // Temperature up or down
                 {
-                    // Display the current A/C target on the LCD
-                    xI2CMessage xMessage;
-                    xMessage.xMessageType = I2C_PRINT_TARGET;
-                    xQueueSend(xI2CQueue, &xMessage, portMAX_DELAY);
+                    int delta = (button_index == BUTTON_INDEX_UP) ? +1 : -1;
+                    if (wdata.ac_mode == AC_MODE_COOL)
+                        control.set_cool_to(wdata.cool_to + delta);
+                    if (wdata.ac_mode == AC_MODE_HEAT)
+                        control.set_heat_to(wdata.heat_to + delta);
+                    if (wdata.ac_mode == AC_MODE_AUTO)
+                    {
+                        // Display the current A/C target on the LCD
+                        xI2CMessage xMessage;
+                        xMessage.xMessageType = I2C_PRINT_TARGET;
+                        xQueueSend(xI2CQueue, &xMessage, portMAX_DELAY);
+                    }
                 }
             }
-#endif
-#if UI == 2
-            // Pressing "C" or "down" in AC mode off enters the cooling mode
-            else if ((wdata.ac_mode == AC_MODE_OFF) && buttons[BUTTON_INDEX_DOWN])
-            {
-                control.set_cool_to(wdata.temp_f + 0.5);
-                control.set_ac_mode(AC_MODE_COOL);
-            }
-            // Pressing "H" or "up" in AC mode off enters the heating mode
-            else if ((wdata.ac_mode == AC_MODE_OFF) && buttons[BUTTON_INDEX_UP])
-            {
-                control.set_heat_to(wdata.temp_f - 0.5);
-                control.set_ac_mode(AC_MODE_HEAT);
-            }
-            // In cooling mode, selecting too high a temperature turns the cooling off
-            else if ((wdata.ac_mode == AC_MODE_COOL) && ((wdata.temp_f + 4.5) <= wdata.cool_to) && buttons[BUTTON_INDEX_UP])
-                control.set_ac_mode(AC_MODE_OFF);
-            // In heating mode, selecting too low a temperature turns the heating off
-            else if ((wdata.ac_mode == AC_MODE_HEAT) && ((wdata.temp_f - 4.5) >= wdata.heat_to) && buttons[BUTTON_INDEX_DOWN])
-                control.set_ac_mode(AC_MODE_OFF);
-            else // Otherwise, adjust the target temperature up or down
-            {
-                int delta = (button_index == BUTTON_INDEX_UP) ? +1 : -1;
-                if (wdata.ac_mode == AC_MODE_COOL)
-                    control.set_cool_to(wdata.cool_to + delta);
-                if (wdata.ac_mode == AC_MODE_HEAT)
-                    control.set_heat_to(wdata.heat_to + delta);
-            }
-#endif
         }
     }
 }
@@ -261,6 +236,16 @@ static void vTask_read_sensors(void *p)
             changed = false;
         }
 
+        // After a few secs of inactivity in FAN_MODE_AUX mode, switch back to FAN_MODE_OFF mode
+        if (aux_mode_counter)
+        {
+            aux_mode_counter--;
+            if (aux_mode_counter == 0)
+            {
+                control.set_fan_mode(FAN_MODE_OFF);
+            }
+        }
+
         // At the end, preset various response strings that the server should give out. This will happen once a second,
         // whether we have any new data or not.
         webserver_set_response();
@@ -307,34 +292,35 @@ static void vTask_I2C(void *p)
         {
             lcd_init();
         }
+
+        bool also_display_target = false;
+        bool also_display_ac = false;
+
         if (xMessage.xMessageType == I2C_PRINT_FAN)
         {
             lcd.setCursor(0, 1);
             if (wdata.fan_mode == FAN_MODE_OFF)
-                lcd.print("       ");
+                lcd.print("       "), also_display_target = true;
             if (wdata.fan_mode == FAN_MODE_ON)
                 lcd.print("Fan ON ");
             if (wdata.fan_mode == FAN_MODE_CYC)
                 lcd.print("Fan CYC");
+            if (wdata.fan_mode == FAN_MODE_AUX)
+                lcd.print("Mode ? "), also_display_ac = true;
         }
-        if (xMessage.xMessageType == I2C_PRINT_AC)
+        if ((xMessage.xMessageType == I2C_PRINT_AC) || also_display_ac)
         {
             lcd.setCursor(6, 0);
             if (wdata.ac_mode == AC_MODE_OFF)
-                lcd.print("          ");
+                lcd.print("      off ");
             if (wdata.ac_mode == AC_MODE_COOL)
                 lcd.print(" A/C cool ");
             if (wdata.ac_mode == AC_MODE_HEAT)
                 lcd.print(" A/C heat ");
             if (wdata.ac_mode == AC_MODE_AUTO)
                 lcd.print(" A/C auto ");
-
-            lcd.setCursor(12, 1);
-            lcd.write((wdata.ac_mode == AC_MODE_OFF) ? 'C' : uint8_t(CHAR_DOWN));
-            lcd.setCursor(15, 1);
-            lcd.write((wdata.ac_mode == AC_MODE_OFF) ? 'H' : uint8_t(CHAR_UP));
         }
-        if (xMessage.xMessageType == I2C_PRINT_TARGET)
+        if ((xMessage.xMessageType == I2C_PRINT_TARGET) || also_display_target)
         {
             lcd.setCursor(6, 0);
             if (wdata.ac_mode == AC_MODE_OFF)

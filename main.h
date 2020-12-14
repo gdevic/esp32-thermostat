@@ -19,7 +19,8 @@ struct StationData
 #define FAN_MODE_OFF  0
 #define FAN_MODE_ON   1
 #define FAN_MODE_CYC  2
-#define FAN_MODE_LAST FAN_MODE_CYC
+#define FAN_MODE_AUX  3 // Used to change the A/C mode in UI, otherwise equivalent to FAN_MODE_OFF
+#define FAN_MODE_LAST FAN_MODE_AUX
 
     uint8_t ac_mode;    // [NV] A/C mode
 #define AC_MODE_OFF   0
