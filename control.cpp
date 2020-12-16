@@ -68,20 +68,20 @@ void CControl::tick()
             {
                 bool is_cooling = ((relays & PIN_COOL) == 0);
 
-                if (is_cooling && (wdata.temp_f < (float(wdata.cool_to) - 0.5)))
+                if (is_cooling && (wdata.get_temp_f() < (float(wdata.cool_to) - 0.5)))
                     relays |= PIN_COOL;
 
-                if (!is_cooling && (wdata.temp_f > (float(wdata.cool_to) + 0.5)))
+                if (!is_cooling && (wdata.get_temp_f() > (float(wdata.cool_to) + 0.5)))
                     relays &= ~PIN_COOL;
             }
             else if (m_ac_mode == AC_MODE_HEAT)
             {
                 bool is_heating = ((relays & PIN_HEAT) == 0);
 
-                if (is_heating && (wdata.temp_f > (float(wdata.heat_to) + 0.5)))
+                if (is_heating && (wdata.get_temp_f() > (float(wdata.heat_to) + 0.5)))
                     relays |= PIN_HEAT;
 
-                if (!is_heating && (wdata.temp_f <  (float(wdata.heat_to) - 0.5)))
+                if (!is_heating && (wdata.get_temp_f() <  (float(wdata.heat_to) - 0.5)))
                     relays &= ~PIN_HEAT;
             }
 

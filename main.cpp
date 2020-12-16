@@ -216,6 +216,12 @@ static void vTask_read_sensors(void *p)
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
         wdata.seconds++;
 
+        // Read external temperature sensor only if it is enabled (ext_read_sec > 0), and that period's seconds
+        if (wdata.ext_read_sec && ((wdata.seconds % wdata.ext_read_sec) == 0))
+        {
+            get_external_temp();
+        }
+
         // Once every 5 seconds, read temperature sensor
         if ((wdata.seconds % 5) == 0)
         {
@@ -285,8 +291,8 @@ static void vTask_I2C(void *p)
 
             // Update temperature on the screen, round to the nearest
             lcd.setCursor(0, 0);
-            lcd.print(String(int(wdata.temp_f + 0.5), DEC));
-            lcd.print(wdata.temp_valid ? " F" : " ?");
+            lcd.print(String(int(wdata.get_temp_f() + 0.5), DEC));
+            lcd.print(wdata.get_temp_valid() ? " F" : " ?");
         }
         if (xMessage.xMessageType == I2C_LCD_INIT)
         {
@@ -346,6 +352,8 @@ void setup()
     wdata.filter_sec = pref.getUInt("filter_sec", 0);
     wdata.cool_sec = pref.getUInt("cool_sec", 0);
     wdata.heat_sec = pref.getUInt("heat_sec", 0);
+    wdata.ext_server = pref.getString("ext_server", "192.168.1.34/json");
+    wdata.ext_read_sec = pref.getUInt("ext_read_sec", 0);
     pref.end();
 
     setup_wifi();

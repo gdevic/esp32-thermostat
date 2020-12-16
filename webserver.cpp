@@ -54,12 +54,14 @@ void webserver_set_response()
     webtext_root += "\nRSSI = " + String(WiFi.RSSI()); // Signal strength
     webtext_root += "\nGPIO23 = " + String(wdata.gpio23);
     webtext_root += "\nINT_C = " + String((temprature_sens_read() - 32) / 1.8);
-    if (wdata.temp_valid) // Display the temperature value only if it is valid
-    {
-        webtext_root += "\ntemp_c = " + String(wdata.temp_c);
-        webtext_root += "\ntemp_f = " + String(wdata.temp_f);
-    }
     webtext_root += "\ntemp_valid = " + String(wdata.temp_valid);
+    webtext_root += "\ntemp_c = " + String(wdata.temp_c);
+    webtext_root += "\ntemp_f = " + String(wdata.temp_f);
+    webtext_root += "\next_server = " + wdata.ext_server;
+    webtext_root += "\next_read_sec = " + String(wdata.ext_read_sec);
+    webtext_root += "\next_valid = " + String(wdata.ext_valid);
+    webtext_root += "\next_temp_c = " + String(wdata.ext_temp_c);
+    webtext_root += "\next_temp_f = " + String(wdata.ext_temp_f);
     webtext_root += "\nrelays = " + String(wdata.relays);
     webtext_root += "\nfan_on = " + String(!!(~wdata.relays & PIN_FAN));
     webtext_root += "\ncool_on = " + String(!!(~wdata.relays & PIN_COOL));
@@ -83,12 +85,13 @@ void webserver_set_response()
     webtext_json += ", \"tag\":\"" + wdata.tag + "\"";
     webtext_json += ", \"uptime\":" + String(wdata.seconds);
     webtext_json += ", \"status\":" + String(wdata.status);
-    if (wdata.temp_valid) // Add the temperature valid only if it is valid
+    // Json returns only the effective temperature (internal or external sensor)
+    webtext_json += ", \"temp_valid\":" + String(wdata.get_temp_valid());
+    if (wdata.get_temp_valid()) // Add the temperature valid only if it is valid
     {
-        webtext_json += ", \"temp_c\":" + String(wdata.temp_c);
-        webtext_json += ", \"temp_f\":" + String(wdata.temp_f);
+        webtext_json += ", \"temp_c\":" + String(wdata.get_temp_c());
+        webtext_json += ", \"temp_f\":" + String(wdata.get_temp_f());
     }
-    webtext_json += ", \"temp_valid\":" + String(wdata.temp_valid);
     webtext_json += ", \"relays\":" + String(wdata.relays);
     webtext_json += ", \"fan_on\":" + String(!!(~wdata.relays & PIN_FAN));
     webtext_json += ", \"cool_on\":" + String(!!(~wdata.relays & PIN_COOL));
@@ -176,6 +179,8 @@ void handleSet(AsyncWebServerRequest *request)
         bool ok = false;
         ok |= get_parse_value(request, "id", wdata.id, true);
         ok |= get_parse_value(request, "tag", wdata.tag, true);
+        ok |= get_parse_value(request, "ext_server", wdata.ext_server, true);
+        ok |= get_parse_value(request, "ext_read_sec", wdata.ext_read_sec, true);
         ok |= get_parse_value(request, "filter_sec", wdata.filter_sec, true);
         ok |= get_parse_value(request, "cool_sec", wdata.cool_sec, true);
         ok |= get_parse_value(request, "heat_sec", wdata.heat_sec, true);
@@ -260,6 +265,9 @@ void setup_ota()
         request->send(response);
     }, [](AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final)
     {
+        // Stop the web client during the OTA
+        wdata.ext_read_sec = 0;
+
         // Serial.printf("Uploading: index=%d len=%d final=%d\n", index, len, final);
         if (index == 0)
         {
