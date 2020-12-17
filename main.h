@@ -1,7 +1,7 @@
 #include <Arduino.h>
 
 // The version string shown in stats. Nothing depends on it and it is used only to confirm newly flashed firmware.
-#define FIRMWARE_VERSION "1.02"
+#define FIRMWARE_VERSION "1.03"
 
 // Set to 1 to use temperature model for testing (insted of the real temperature value)
 #define USE_MODEL 0
@@ -42,6 +42,10 @@ struct StationData
 
     uint8_t cool_to;    // [NV] Temperature cooling target
     uint8_t heat_to;    // [NV] Temperature heating target
+
+    // Adjustable hysteresis on cooling and heating: delta temps to turn on and off the appliance
+    float hyst_trigger; // [NV] Hysteresis trigger temperature delta
+    float hyst_release; // [NV] Hysteresis release temperature delta
 
     uint32_t seconds;   // Uptime seconds counter (shown as "uptime" in web reports)
     uint32_t filter_sec;// [NV] Total A/C + fan on time in seconds

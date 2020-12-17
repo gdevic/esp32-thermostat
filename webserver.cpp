@@ -71,6 +71,8 @@ void webserver_set_response()
     webtext_root += "\nac_mode = " + String(wdata.ac_mode);
     webtext_root += "\ncool_to = " + String(wdata.cool_to);
     webtext_root += "\nheat_to = " + String(wdata.heat_to);
+    webtext_root += "\nhyst_trigger = " + String(wdata.hyst_trigger);
+    webtext_root += "\nhyst_release = " + String(wdata.hyst_release);
     webtext_root += "\nfilter_sec = " + String(wdata.filter_sec);
     webtext_root += "\ncool_sec = " + String(wdata.cool_sec);
     webtext_root += "\nheat_sec = " + String(wdata.heat_sec);
@@ -181,6 +183,8 @@ void handleSet(AsyncWebServerRequest *request)
         ok |= get_parse_value(request, "tag", wdata.tag, true);
         ok |= get_parse_value(request, "ext_server", wdata.ext_server, true);
         ok |= get_parse_value(request, "ext_read_sec", wdata.ext_read_sec, true);
+        ok |= get_parse_value(request, "hyst_trigger", wdata.hyst_trigger, true);
+        ok |= get_parse_value(request, "hyst_release", wdata.hyst_release, true);
         ok |= get_parse_value(request, "filter_sec", wdata.filter_sec, true);
         ok |= get_parse_value(request, "cool_sec", wdata.cool_sec, true);
         ok |= get_parse_value(request, "heat_sec", wdata.heat_sec, true);

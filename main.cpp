@@ -345,15 +345,21 @@ void setup()
 {
     delay(2000); // Start with some delay to sleep over any quick power glitches
 
-    // Read the initial values stored in the NVM
+    // Read the initial values stored in the NV (not-volatile memory)
     pref.begin("wd", true);
     wdata.id = pref.getString("id", "Thermostat");
     wdata.tag = pref.getString("tag", "Smart Thermostat station");
+    wdata.ext_server = pref.getString("ext_server", "192.168.1.34/json");
+    wdata.ext_read_sec = pref.getUInt("ext_read_sec", 0);
+    wdata.fan_mode = pref.getUChar("fan_mode", FAN_MODE_OFF);
+    wdata.ac_mode = pref.getUChar("ac_mode", AC_MODE_OFF);
+    wdata.cool_to = pref.getUChar("cool_to", 90);
+    wdata.heat_to = pref.getUChar("heat_to", 60);
+    wdata.hyst_trigger = pref.getFloat("hyst_trigger", 1.5);
+    wdata.hyst_release = pref.getFloat("hyst_release", 0.5);
     wdata.filter_sec = pref.getUInt("filter_sec", 0);
     wdata.cool_sec = pref.getUInt("cool_sec", 0);
     wdata.heat_sec = pref.getUInt("heat_sec", 0);
-    wdata.ext_server = pref.getString("ext_server", "192.168.1.34/json");
-    wdata.ext_read_sec = pref.getUInt("ext_read_sec", 0);
     pref.end();
 
     setup_wifi();
@@ -378,14 +384,6 @@ void setup()
         tskIDLE_PRIORITY,    // Priority of the task
         nullptr,             // Task handle
         APP_CPU);            // Core where the task should run (user program core)
-
-    // Recover controller state
-    pref.begin("wd", true);
-    wdata.fan_mode = pref.getUChar("fan_mode", FAN_MODE_OFF);
-    wdata.ac_mode = pref.getUChar("ac_mode", AC_MODE_OFF);
-    wdata.cool_to = pref.getUChar("cool_to", 90);
-    wdata.heat_to = pref.getUChar("heat_to", 60);
-    pref.end();
 
     delay(1000); // Give a second for all the tasks to start
 
