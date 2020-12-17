@@ -25,13 +25,17 @@ static SemaphoreHandle_t webtext_semaphore; // Semaphore guarding the access to 
 
 AsyncWebServer server(80);
 
-String get_time_str(uint32_t sec)
+String get_time_str(uint32_t sec, bool days)
 {
     uint32_t seconds = (sec % 60);
     uint32_t minutes = (sec % 3600) / 60;
     uint32_t hours = (sec % 86400) / 3600;
-    uint32_t days = (sec % (86400 * 30)) / 86400;
-    return String(days) + ":" + String(hours) + ":" + String(minutes) + ":" + String(seconds);
+    if (days)
+    {
+        uint32_t days = (sec % (86400 * 30)) / 86400;
+        return String(days) + ":" + String(hours) + ":" + String(minutes) + ":" + String(seconds);
+    }
+    return String(hours) + ":" + String(minutes) + ":" + String(seconds);
 }
 
 void webserver_set_response()
@@ -49,7 +53,7 @@ void webserver_set_response()
     webtext_root += "\nTAG = " + wdata.tag;
     webtext_root += "\nMAC = " + wifi_mac;
     webtext_root += "\nstatus = " + String(wdata.status);
-    webtext_root += "\nuptime = " + get_time_str(wdata.seconds);
+    webtext_root += "\nuptime = " + get_time_str(wdata.seconds, true);
     webtext_root += "\nreconnects = " + String(reconnects);
     webtext_root += "\nRSSI = " + String(WiFi.RSSI()); // Signal strength
     webtext_root += "\nGPIO23 = " + String(wdata.gpio23);
@@ -76,9 +80,9 @@ void webserver_set_response()
     webtext_root += "\nfilter_sec = " + String(wdata.filter_sec);
     webtext_root += "\ncool_sec = " + String(wdata.cool_sec);
     webtext_root += "\nheat_sec = " + String(wdata.heat_sec);
-    webtext_root += "\nfilter_hms = " + get_time_str(wdata.filter_sec);
-    webtext_root += "\ncool_hms = " + get_time_str(wdata.cool_sec);
-    webtext_root += "\nheat_hms = " + get_time_str(wdata.heat_sec);
+    webtext_root += "\nfilter_hms = " + get_time_str(wdata.filter_sec, false);
+    webtext_root += "\ncool_hms = " + get_time_str(wdata.cool_sec, false);
+    webtext_root += "\nheat_hms = " + get_time_str(wdata.heat_sec, false);
     webtext_root += String("</pre></body></html>\n");
 
     // Format the json response
