@@ -85,6 +85,7 @@ typedef struct
 extern QueueHandle_t xI2CQueue; // The queue of messages to the I2C task
 
 // From main.cpp
+void pref_set(const char* name, bool value);
 void pref_set(const char* name, uint8_t value);
 void pref_set(const char* name, uint32_t value);
 void pref_set(const char* name, float value);

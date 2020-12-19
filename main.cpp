@@ -173,7 +173,14 @@ void setup_sw()
     gpio_isr_handler_add(GPIO_INPUT_IO_2, gpio_isr_handler, (void*) BUTTON_INDEX_UP);
 }
 
-// Set a preference string value pairs, we are using char, int, float and string variants
+// Set a preference string value pairs for various data types
+void pref_set(const char* name, bool value)
+{
+    pref.begin("wd", false);
+    pref.putBool(name, value);
+    pref.end();
+}
+
 void pref_set(const char* name, uint8_t value)
 {
     pref.begin("wd", false);
