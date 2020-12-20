@@ -192,10 +192,12 @@ void handleSet(AsyncWebServerRequest *request)
         ok |= get_parse_value(request, "filter_sec", wdata.filter_sec, true);
         ok |= get_parse_value(request, "cool_sec", wdata.cool_sec, true);
         ok |= get_parse_value(request, "heat_sec", wdata.heat_sec, true);
+        // The following set of variables do not store their new value in NV
         ok |= get_parse_value(request, "fan_mode", u8, false);
         ok |= get_parse_value(request, "ac_mode", u8, false);
         ok |= get_parse_value(request, "cool_to", u8, false);
         ok |= get_parse_value(request, "heat_to", u8, false);
+        ok |= get_parse_value(request, "status", wdata.status, false);
         if (!ok)
             request->send(400, "text/html", "Invalid request");
         else
