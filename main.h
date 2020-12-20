@@ -98,7 +98,6 @@ void pref_set(const char* name, float value);
 void pref_set(const char* name, String value);
 
 // From webserver.cpp
-void webserver_set_response();
 void setup_wifi();
 void setup_webserver();
 void wifi_check_loop();

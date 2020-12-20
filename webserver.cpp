@@ -21,7 +21,6 @@ static String webtext_root; // Web response to / (root)
 static String webtext_json; // Web response to /json
 static uint32_t reconnects = 0; // Count how many times WiFi had to reconnect (for stats)
 static String wifi_mac; // WiFi MAC address of this station
-static SemaphoreHandle_t webtext_semaphore; // Semaphore guarding the access to webtext strings as we are building them
 
 AsyncWebServer server(80);
 
@@ -38,16 +37,10 @@ String get_time_str(uint32_t sec, bool days)
     return String(hours) + ":" + String(minutes) + ":" + String(seconds);
 }
 
-void webserver_set_response()
+void get_webserver_response_html()
 {
-    // Wait 20 ms before giving up. In practice, there are no other tasks that could block this sem. for longer than that
-    // This task will take the longest due to a number of string operations
-    if (xSemaphoreTake(webtext_semaphore, TickType_t(20)) != pdTRUE)
-        return;
-
     // Make this web page auto-refresh every 5 sec
-    webtext_root = String("<!DOCTYPE html><html><head><meta http-equiv=\"refresh\" content=\"5\"></head><body><pre>");
-
+    webtext_root = "<!DOCTYPE html><html><head><meta http-equiv=\"refresh\" content=\"5\"></head><body><pre>";
     webtext_root += "\nVER = " + String(FIRMWARE_VERSION);
     webtext_root += "\nID = " + wdata.id;
     webtext_root += "\nTAG = " + wdata.tag;
@@ -83,9 +76,11 @@ void webserver_set_response()
     webtext_root += "\nfilter_hms = " + get_time_str(wdata.filter_sec, false);
     webtext_root += "\ncool_hms = " + get_time_str(wdata.cool_sec, false);
     webtext_root += "\nheat_hms = " + get_time_str(wdata.heat_sec, false);
-    webtext_root += String("</pre></body></html>\n");
+    webtext_root += "</pre></body></html>\n";
+}
 
-    // Format the json response
+void get_webserver_response_json()
+{
     webtext_json = "{";
     webtext_json += " \"id\":\"" + wdata.id + "\"";
     webtext_json += ", \"tag\":\"" + wdata.tag + "\"";
@@ -111,32 +106,18 @@ void webserver_set_response()
     webtext_json += ", \"cool_sec\":" + String(wdata.cool_sec);
     webtext_json += ", \"heat_sec\":" + String(wdata.heat_sec);
     webtext_json += " }";
-
-    xSemaphoreGive(webtext_semaphore);
 }
 
 void handleRoot(AsyncWebServerRequest *request)
 {
-    if (xSemaphoreTake(webtext_semaphore, TickType_t(100)) == pdTRUE)
-    {
-        request->send(200, "text/html", webtext_root);
-        xSemaphoreGive(webtext_semaphore);
-    }
-    else
-        request->send(503, "text/html", "Resource busy, please retry.");
+    get_webserver_response_html();
+    request->send(200, "text/html", webtext_root);
 }
 
 void handleJson(AsyncWebServerRequest *request)
 {
-    if (xSemaphoreTake(webtext_semaphore, TickType_t(100)) == pdTRUE)
-    {
-        request->send(200, "application/json", webtext_json);
-        xSemaphoreGive(webtext_semaphore);
-    }
-    else
-    {
-        request->send(503, "application/json", "{ \"id\":\"" + wdata.id + "\" }");
-    }
+    get_webserver_response_json();
+    request->send(200, "application/json", webtext_json);
 }
 
 template<class T> T parse(String value, char **p_next);
@@ -178,44 +159,37 @@ static bool get_parse_value(AsyncWebServerRequest *request, String key_name, T& 
 // Set a variable from the client side. The key/value pairs are passed using an HTTP GET method.
 void handleSet(AsyncWebServerRequest *request)
 {
-    if (xSemaphoreTake(webtext_semaphore, TickType_t(100)) == pdTRUE)
-    {
-        uint8_t u8;
-        // Updating one at a time will respond with "OK" followed by the new value
-        bool ok = false;
-        ok |= get_parse_value(request, "id", wdata.id, true);
-        ok |= get_parse_value(request, "tag", wdata.tag, true);
-        ok |= get_parse_value(request, "ext_server", wdata.ext_server, true);
-        ok |= get_parse_value(request, "ext_read_sec", wdata.ext_read_sec, true);
-        ok |= get_parse_value(request, "hyst_trigger", wdata.hyst_trigger, true);
-        ok |= get_parse_value(request, "hyst_release", wdata.hyst_release, true);
-        ok |= get_parse_value(request, "filter_sec", wdata.filter_sec, true);
-        ok |= get_parse_value(request, "cool_sec", wdata.cool_sec, true);
-        ok |= get_parse_value(request, "heat_sec", wdata.heat_sec, true);
-        // The following set of variables do not store their new value in NV
-        ok |= get_parse_value(request, "fan_mode", u8, false);
-        ok |= get_parse_value(request, "ac_mode", u8, false);
-        ok |= get_parse_value(request, "cool_to", u8, false);
-        ok |= get_parse_value(request, "heat_to", u8, false);
-        ok |= get_parse_value(request, "status", wdata.status, false);
-        if (!ok)
-            request->send(400, "text/html", "Invalid request");
-        else
-        {
-            if (request->arg("fan_mode").length())
-                control.set_fan_mode(u8);
-            else if (request->arg("ac_mode").length())
-                control.set_ac_mode(u8);
-            else if (request->arg("cool_to").length())
-                control.set_cool_to(u8);
-            else if (request->arg("heat_to").length())
-                control.set_heat_to(u8);
-        }
-
-        xSemaphoreGive(webtext_semaphore);
-    }
+    uint8_t u8;
+    // Updating one at a time will respond with "OK" followed by the new value
+    bool ok = false;
+    ok |= get_parse_value(request, "id", wdata.id, true);
+    ok |= get_parse_value(request, "tag", wdata.tag, true);
+    ok |= get_parse_value(request, "ext_server", wdata.ext_server, true);
+    ok |= get_parse_value(request, "ext_read_sec", wdata.ext_read_sec, true);
+    ok |= get_parse_value(request, "hyst_trigger", wdata.hyst_trigger, true);
+    ok |= get_parse_value(request, "hyst_release", wdata.hyst_release, true);
+    ok |= get_parse_value(request, "filter_sec", wdata.filter_sec, true);
+    ok |= get_parse_value(request, "cool_sec", wdata.cool_sec, true);
+    ok |= get_parse_value(request, "heat_sec", wdata.heat_sec, true);
+    // The following set of variables do not store their new value in NV
+    ok |= get_parse_value(request, "fan_mode", u8, false);
+    ok |= get_parse_value(request, "ac_mode", u8, false);
+    ok |= get_parse_value(request, "cool_to", u8, false);
+    ok |= get_parse_value(request, "heat_to", u8, false);
+    ok |= get_parse_value(request, "status", wdata.status, false);
+    if (!ok)
+        request->send(400, "text/html", "Invalid request");
     else
-        request->send(503, "text/html", "Resource busy, please retry.");
+    {
+        if (request->arg("fan_mode").length())
+            control.set_fan_mode(u8);
+        else if (request->arg("ac_mode").length())
+            control.set_ac_mode(u8);
+        else if (request->arg("cool_to").length())
+            control.set_cool_to(u8);
+        else if (request->arg("heat_to").length())
+            control.set_heat_to(u8);
+    }
 }
 
 const char* uploadHtml = " \
@@ -345,10 +319,6 @@ void setup_wifi()
 
 void setup_webserver()
 {
-    webtext_semaphore = xSemaphoreCreateMutex();
-    xSemaphoreGive(webtext_semaphore);
-
-    webserver_set_response();
     server.on("/", handleRoot);
     server.on("/json", handleJson);
     server.on("/set", handleSet);

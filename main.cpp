@@ -275,10 +275,6 @@ static void vTask_read_sensors(void *p)
                 xQueueSend(xI2CQueue, &xMessage, portMAX_DELAY);
             }
         }
-
-        // At the end, preset various response strings that the server should give out. This will happen once a second,
-        // whether we have any new data or not.
-        webserver_set_response();
     }
 }
 
