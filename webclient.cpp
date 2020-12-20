@@ -2,6 +2,7 @@
 #include "ArduinoJson.h"
 #include <WiFi.h>
 #include <HTTPClient.h>
+
 // Reading a temperature from an external sensor
 // This is normally one of my other WiFi sensors that publish its data via json http response
 // Needs ArduinoJson library by Benoit Blanchon

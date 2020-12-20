@@ -221,7 +221,7 @@ void pref_set(const char* name, String value)
     pref.end();
 }
 
-static void vTask_read_sensors(void *p)
+static void vTask_1s_tick(void *p)
 {
     // Make this task sleep and awake once a second
     const TickType_t xFrequency = 1 * 1000 / portTICK_PERIOD_MS;
@@ -235,7 +235,7 @@ static void vTask_read_sensors(void *p)
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
         wdata.seconds++;
 
-        // Read external temperature sensor only if it is enabled (ext_read_sec > 0), and that period's seconds
+        // Read external temperature sensor only if it is enabled (ext_read_sec > 0) and such specified number of seconds elapsed
         if (wdata.ext_read_sec && ((wdata.seconds % wdata.ext_read_sec) == 0))
         {
             get_external_temp();
@@ -406,8 +406,8 @@ void setup()
         APP_CPU);            // Core where the task should run (user program core)
 
     xTaskCreatePinnedToCore(
-        vTask_read_sensors,  // Task function
-        "task_sensors",      // Name of the task
+        vTask_1s_tick,       // Task function
+        "task_1s",           // Name of the task
         2048,                // Stack size in bytes
         &wdata,              // Parameter passed as input to the task
         tskIDLE_PRIORITY,    // Priority of the task
