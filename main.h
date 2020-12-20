@@ -59,6 +59,12 @@ struct StationData
     uint32_t status;      // Bitfield containing possible errors and status bits
     uint8_t relays { 0xFF }; // Effective state of the relay control byte
     bool gpio23;          // GPIO23 strap value
+
+    // Debug methods
+    int task_1s {-1};     // Stack high watermark for the named task
+    int task_i2c {-1};    // Stack high watermark for the named task
+    int task_control {-1};// Stack high watermark for the named task
+    int task_gpio {-1};   // Stack high watermark for the named task
 };
 
 extern StationData wdata;

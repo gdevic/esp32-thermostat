@@ -76,6 +76,8 @@ void get_webserver_response_html()
     webtext_root += "\nfilter_hms = " + get_time_str(wdata.filter_sec, false);
     webtext_root += "\ncool_hms = " + get_time_str(wdata.cool_sec, false);
     webtext_root += "\nheat_hms = " + get_time_str(wdata.heat_sec, false);
+    webtext_root += "\nstack_watermarks = " +
+        String(wdata.task_1s) + "," + String(wdata.task_i2c) + "," + String(wdata.task_control) + "," + String(wdata.task_gpio);
     webtext_root += "</pre></body></html>\n";
 }
 

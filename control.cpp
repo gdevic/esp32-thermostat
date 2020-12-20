@@ -12,6 +12,8 @@ static void vTask_control(void *p)
         // Once a second call the control class' tick method
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
         static_cast<CControl *>(p)->tick();
+
+        wdata.task_control = uxTaskGetStackHighWaterMark(nullptr);
     }
 }
 

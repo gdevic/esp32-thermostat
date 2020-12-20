@@ -159,6 +159,8 @@ static void vTask_gpio(void* arg)
                 }
             }
         }
+
+        wdata.task_gpio = uxTaskGetStackHighWaterMark(nullptr);
     }
 }
 
@@ -275,6 +277,8 @@ static void vTask_1s_tick(void *p)
                 xQueueSend(xI2CQueue, &xMessage, portMAX_DELAY);
             }
         }
+
+        wdata.task_1s = uxTaskGetStackHighWaterMark(nullptr);
     }
 }
 
@@ -367,6 +371,8 @@ static void vTask_I2C(void *p)
             else if (wdata.ac_mode == AC_MODE_AUTO)
                 lcd.print("auto " + String(wdata.cool_to) + "/" + String(wdata.heat_to));
         }
+
+        wdata.task_i2c = uxTaskGetStackHighWaterMark(nullptr);
     }
 }
 
