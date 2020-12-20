@@ -88,10 +88,10 @@ static void lcd_init()
 #define ESP_INTR_FLAG_DEFAULT 0
 static xQueueHandle gpio_evt_queue = nullptr;
 static bool buttons[3] {};
-static uint32_t aux_mode_counter {}; // Seconds to switch off from the FAN_MODE_AUX mode
-#define BUTTON_INDEX_FAN  0
-#define BUTTON_INDEX_DOWN 1
-#define BUTTON_INDEX_UP   2
+static uint32_t option_mode_counter {}; // Seconds to switch off from the option mode selector
+#define BUTTON_INDEX_OPTION  0
+#define BUTTON_INDEX_DOWN    1
+#define BUTTON_INDEX_UP      2
 //------------------------------------------------------------------------------------------
 static void IRAM_ATTR gpio_isr_handler(void *arg)
 {
@@ -114,21 +114,33 @@ static void vTask_gpio(void* arg)
 
         bool level = buttons[button_index];
 
-        if (level) // Consider buttons only on a button press transition
+        if (level) // Consider buttons only on a press transition
         {
-            // Manual fan mode button
-            if (button_index == BUTTON_INDEX_FAN)
+            if (button_index == BUTTON_INDEX_OPTION)
+            {
+                wdata.option = wdata.option + 1;
+                if (wdata.option > OPTION_LAST)
+                    wdata.option = OPTION_OFF;
+                option_mode_counter = 7;
+
+                // Display the current options on the LCD
+                xI2CMessage xMessage;
+                xMessage.xMessageType = I2C_PRINT_OPTIONS;
+                xQueueSend(xI2CQueue, &xMessage, portMAX_DELAY);
+            }
+            else // When the options are setting up fan, up or down buttons change fan mode
+            if (wdata.option == OPTION_FAN)
             {
                 control.set_fan_mode(wdata.fan_mode + 1);
-                aux_mode_counter = (wdata.fan_mode == FAN_MODE_AUX) ? 7 : 0;
+                option_mode_counter = 7;
             }
-            else // When the fan mode is AUX, up or down buttons change the A/C mode
-            if (wdata.fan_mode == FAN_MODE_AUX)
+            else // When the options are setting the A/C mode, up or down buttons change it
+            if (wdata.option == OPTION_AC)
             {
                 control.set_ac_mode(wdata.ac_mode + 1);
-                aux_mode_counter = 7;
+                option_mode_counter = 7;
             }
-            else // When the fan mode is not AUX, up or down buttons, as expected, change the temperature
+            else // Otherwise, up or down buttons, as expected, change the temperature
             {
                 if (buttons[1] || buttons[2]) // Temperature up or down
                 {
@@ -168,7 +180,7 @@ void setup_sw()
     // Install gpio isr service
     gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT);
     // Hook isr handlers for specific gpio pins
-    gpio_isr_handler_add(GPIO_INPUT_IO_0, gpio_isr_handler, (void*) BUTTON_INDEX_FAN);
+    gpio_isr_handler_add(GPIO_INPUT_IO_0, gpio_isr_handler, (void*) BUTTON_INDEX_OPTION);
     gpio_isr_handler_add(GPIO_INPUT_IO_1, gpio_isr_handler, (void*) BUTTON_INDEX_DOWN);
     gpio_isr_handler_add(GPIO_INPUT_IO_2, gpio_isr_handler, (void*) BUTTON_INDEX_UP);
 }
@@ -249,13 +261,18 @@ static void vTask_read_sensors(void *p)
             changed = false;
         }
 
-        // After a few secs of inactivity in FAN_MODE_AUX mode, switch back to FAN_MODE_OFF mode
-        if (aux_mode_counter)
+        // After a few secs of inactivity in the option mode, switch back to normal operation
+        if (option_mode_counter)
         {
-            aux_mode_counter--;
-            if (aux_mode_counter == 0)
+            option_mode_counter--;
+            if (option_mode_counter == 0)
             {
-                control.set_fan_mode(FAN_MODE_OFF);
+                wdata.option = OPTION_OFF;
+
+                // Display the current options on the LCD
+                xI2CMessage xMessage;
+                xMessage.xMessageType = I2C_PRINT_OPTIONS;
+                xQueueSend(xI2CQueue, &xMessage, portMAX_DELAY);
             }
         }
 
@@ -306,32 +323,41 @@ static void vTask_I2C(void *p)
             lcd_init();
         }
 
-        bool also_display_target = false;
+        bool also_display_fan = false;
         bool also_display_ac = false;
+        bool also_display_target = false;
 
-        if (xMessage.xMessageType == I2C_PRINT_FAN)
+        if (xMessage.xMessageType == I2C_PRINT_OPTIONS)
         {
-            lcd.setCursor(0, 1);
+            lcd.setCursor(6, 0);
+            if (wdata.option == OPTION_OFF)
+                lcd.print("      "), also_display_target = true;
+            if (wdata.option == OPTION_FAN)
+                lcd.print("  Fan "), also_display_fan = true;
+            if (wdata.option == OPTION_AC)
+                lcd.print("  A/C "), also_display_ac = true;
+        }
+        if ((xMessage.xMessageType == I2C_PRINT_FAN) || also_display_fan)
+        {
+            lcd.setCursor(12, 0);
             if (wdata.fan_mode == FAN_MODE_OFF)
-                lcd.print("       "), also_display_target = true;
+                lcd.print("OFF ");
             else if (wdata.fan_mode == FAN_MODE_ON)
-                lcd.print("Fan ON ");
+                lcd.print("ON  ");
             else if (wdata.fan_mode == FAN_MODE_CYC)
-                lcd.print("Fan CYC");
-            else if (wdata.fan_mode == FAN_MODE_AUX)
-                lcd.print("Mode ? "), also_display_ac = true;
+                lcd.print("CYC ");
         }
         if ((xMessage.xMessageType == I2C_PRINT_AC) || also_display_ac)
         {
-            lcd.setCursor(6, 0);
+            lcd.setCursor(12, 0);
             if (wdata.ac_mode == AC_MODE_OFF)
-                lcd.print("      off ");
+                lcd.print("OFF ");
             else if (wdata.ac_mode == AC_MODE_COOL)
-                lcd.print(" A/C cool ");
+                lcd.print("COOL");
             else if (wdata.ac_mode == AC_MODE_HEAT)
-                lcd.print(" A/C heat ");
+                lcd.print("HEAT");
             else if (wdata.ac_mode == AC_MODE_AUTO)
-                lcd.print(" A/C auto ");
+                lcd.print("AUTO");
         }
         if ((xMessage.xMessageType == I2C_PRINT_TARGET) || also_display_target)
         {

@@ -26,12 +26,17 @@ struct StationData
     inline float get_temp_f() { return ext_valid ? ext_temp_f : temp_f; }
     inline bool get_temp_valid() { return ext_valid ? true : temp_valid; }
 
+    uint8_t option { 0 };// UI option mode
+#define OPTION_OFF    0 // No option
+#define OPTION_FAN    1 // Setting the fan mode
+#define OPTION_AC     2 // Setting the AC mode
+#define OPTION_LAST   OPTION_AC
+
     uint8_t fan_mode;   // [NV] Fan operation mode: OFF, ON, CYC
 #define FAN_MODE_OFF  0
 #define FAN_MODE_ON   1
 #define FAN_MODE_CYC  2
-#define FAN_MODE_AUX  3 // Used to change the A/C mode in UI, otherwise equivalent to FAN_MODE_OFF
-#define FAN_MODE_LAST FAN_MODE_AUX
+#define FAN_MODE_LAST FAN_MODE_CYC
 
     uint8_t ac_mode;    // [NV] A/C mode
 #define AC_MODE_OFF   0
@@ -75,12 +80,13 @@ typedef struct
     uint8_t bMessage;
 } xI2CMessage;
 
-#define I2C_READ_TEMP    0
-#define I2C_LCD_INIT     1
-#define I2C_PRINT_FAN    2
-#define I2C_PRINT_AC     3
-#define I2C_PRINT_TARGET 4
-#define I2C_SET_RELAYS   5
+#define I2C_LCD_INIT      0
+#define I2C_READ_TEMP     1
+#define I2C_SET_RELAYS    2
+#define I2C_PRINT_FAN     3
+#define I2C_PRINT_AC      4
+#define I2C_PRINT_TARGET  5
+#define I2C_PRINT_OPTIONS 6
 
 extern QueueHandle_t xI2CQueue; // The queue of messages to the I2C task
 
