@@ -86,7 +86,7 @@ void get_webserver_response_html()
     p += sprintf(p, "\nfilter_hms = %s", get_time_str(wdata.filter_sec, false));
     p += sprintf(p, "\ncool_hms = %s", get_time_str(wdata.cool_sec, false));
     p += sprintf(p, "\nheat_hms = %s", get_time_str(wdata.heat_sec, false));
-    p += sprintf(p, "\nstack_watermarks = %d,%d,%d,%d", wdata.task_1s, wdata.task_i2c, wdata.task_control, wdata.task_gpio);
+    p += sprintf(p, "\nstack_watermarks = %d,%d,%d,%d,%d", wdata.task_1s, wdata.task_i2c, wdata.task_control, wdata.task_gpio, wdata.task_ext);
     p += sprintf(p, "</pre></body></html>\n");
 
     if (webtext_root[sizeof(webtext_root) - 1] != 0xFF)
@@ -180,7 +180,7 @@ void get_webserver_response_html()
     webtext_root += "\ncool_hms = " + get_time_str(wdata.cool_sec, false);
     webtext_root += "\nheat_hms = " + get_time_str(wdata.heat_sec, false);
     webtext_root += "\nstack_watermarks = " +
-        String(wdata.task_1s) + "," + String(wdata.task_i2c) + "," + String(wdata.task_control) + "," + String(wdata.task_gpio);
+        String(wdata.task_1s) + "," + String(wdata.task_i2c) + "," + String(wdata.task_control) + "," + String(wdata.task_gpio) + "," + String(wdata.task_ext);
     webtext_root += "</pre></body></html>\n";
 }
 

@@ -1,7 +1,6 @@
 #include "main.h"
 #include "ArduinoJson.h"
 #include <WiFi.h>
-#include <HTTPClient.h>
 
 // Reading a temperature from an external sensor
 // This is normally one of my other WiFi sensors that publish its data via json http response
@@ -9,16 +8,37 @@
 
 static StaticJsonDocument<512> doc;
 
-void get_external_temp()
+// Returns false if connection to the external server failed
+static bool get_external_temp()
 {
-    HTTPClient http;
+    // Use WiFiClient class to create TCP connections
+    WiFiClient client;
 
-    http.begin("http://" + wdata.ext_server);
-    int httpResponseCode = http.GET();
-
-    if (httpResponseCode > 0)
+    if (!client.connect(wdata.ext_server.c_str(), 80))
     {
-        const char *json = http.getString().c_str();
+        Serial.println("Unable to connect");
+        return false;
+    }
+
+    // This will send the request to the server
+    client.println("GET /json HTTP/1.0");
+    client.println();
+    unsigned long timeout = millis();
+    while (client.available() == 0)
+    {
+        if (millis() - timeout > 5000)
+        {
+            Serial.println("Client timed out");
+            client.stop();
+            return false;
+        }
+    }
+
+    // Read a line of the reply from server which should be a line of json data
+    while(client.available())
+    {
+        String line = client.readStringUntil('\r');
+        const char *json = line.c_str();
         DeserializationError error = deserializeJson(doc, json);
         if (error)
         {
@@ -41,11 +61,32 @@ void get_external_temp()
             }
         }
     }
-    else
-    {
-        wdata.status |= STATUS_EXT_GET_ERROR;
-        wdata.ext_valid = false;
-    }
+    return true;
+}
 
-    http.end();
+void vTask_ext_temp(void *p)
+{
+    while(true)
+    {
+        // Read external temperature sensor only if it is enabled (ext_read_sec > 0)
+        if (wdata.ext_read_sec)
+        {
+            int retries = 5; // Retry connecting to the external server several times before giving up
+            while (retries && (get_external_temp() == false))
+            {
+                vTaskDelay(5 * 1000 / portTICK_PERIOD_MS); // Delay 5 seconds before retrying the request
+                retries--;
+            }
+            if (retries == 0)
+                wdata.ext_valid = false;
+        }
+        else
+            wdata.ext_valid = false;
+
+        // Wait for the next time we need to read the external sensor
+        // Either wait for 1 sec (if the ext_read_sec is 0) or up to a minute
+        vTaskDelay(constrain(wdata.ext_read_sec, 1, 60) * 1000 / portTICK_PERIOD_MS);
+
+        wdata.task_ext = uxTaskGetStackHighWaterMark(nullptr);
+    }
 }

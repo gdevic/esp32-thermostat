@@ -237,12 +237,6 @@ static void vTask_1s_tick(void *p)
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
         wdata.seconds++;
 
-        // Read external temperature sensor only if it is enabled (ext_read_sec > 0) and such specified number of seconds elapsed
-        if (wdata.ext_read_sec && ((wdata.seconds % wdata.ext_read_sec) == 0))
-        {
-            get_external_temp();
-        }
-
         // Once every 5 seconds, read temperature sensor
         if ((wdata.seconds % 5) == 0)
         {
@@ -378,6 +372,9 @@ static void vTask_I2C(void *p)
 
 void setup()
 {
+    Serial.begin(115200);
+    Serial.println("START");
+
     delay(2000); // Start with some delay to sleep over any quick power glitches
 
     // Read the initial values stored in the NV (not-volatile memory)
@@ -416,6 +413,15 @@ void setup()
         "task_1s",           // Name of the task
         2048,                // Stack size in bytes
         &wdata,              // Parameter passed as input to the task
+        tskIDLE_PRIORITY,    // Priority of the task
+        nullptr,             // Task handle
+        APP_CPU);            // Core where the task should run (user program core)
+
+    xTaskCreatePinnedToCore(
+        vTask_ext_temp,      // Task function
+        "task_ext_temp",     // Name of the task
+        2048,                // Stack size in bytes
+        nullptr,             // Parameter passed as input to the task
         tskIDLE_PRIORITY,    // Priority of the task
         nullptr,             // Task handle
         APP_CPU);            // Core where the task should run (user program core)

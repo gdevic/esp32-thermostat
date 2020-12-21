@@ -65,6 +65,7 @@ struct StationData
     int task_i2c {-1};    // Stack high watermark for the named task
     int task_control {-1};// Stack high watermark for the named task
     int task_gpio {-1};   // Stack high watermark for the named task
+    int task_ext {-1};    // Stack high watermark for the named task
 };
 
 extern StationData wdata;
@@ -110,4 +111,4 @@ void setup_webserver();
 void wifi_check_loop();
 
 // From webclient.cpp
-void get_external_temp();
+void vTask_ext_temp(void *p);
