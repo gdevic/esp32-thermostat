@@ -95,7 +95,7 @@ void get_webserver_response_html()
 
 void get_webserver_response_json()
 {
-    webtext_root[sizeof(webtext_json) - 1] = 0xFF;
+    webtext_json[sizeof(webtext_json) - 1] = 0xFF;
     char *p = webtext_json;
 
     p += sprintf(p, "{");
