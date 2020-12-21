@@ -74,6 +74,7 @@ extern StationData wdata;
 #define STATUS_EXT_GET_ERROR   0x0002 // Http GET error when reading external sensor
 #define STATUS_EXT_JSON_ERROR  0x0004 // Error parsing external temperature json response
 #define STATUS_EXT_TEMP_ERROR  0x0008 // Error reading external temperature sensor
+#define STATUS_BUF_OVERFLOW    0x000C // Web response buffer overflowed
 
 // Specific to ESP32's FreeRTOS port, Arduino loop is running on core 1 and priority 1
 #define PRO_CPU 0

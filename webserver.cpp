@@ -9,6 +9,9 @@
 // https://github.com/me-no-dev/ESPAsyncWebServer
 // https://github.com/me-no-dev/AsyncTCP
 
+// Two variations of web response functions: one using String class and the other one using sprintf()
+#define USE_SPRINTF 1
+
 extern "C" uint8_t temprature_sens_read(); // Very imprecise internal ESP32 temperature value in F
 
 #include "wifi_credentials.h"
@@ -17,23 +20,124 @@ extern "C" uint8_t temprature_sens_read(); // Very imprecise internal ESP32 temp
 // #define MY_PASS "your-password"
 static const char* ssid = MY_SSID;
 static const char* password = MY_PASS;
+#if USE_SPRINTF
+static char webtext_root[1024];
+static char webtext_json[1024];
+#else // USE_SPRINTF
 static String webtext_root; // Web response to / (root)
 static String webtext_json; // Web response to /json
+#endif // USE_SPRINTF
 static uint32_t reconnects = 0; // Count how many times WiFi had to reconnect (for stats)
-static String wifi_mac; // WiFi MAC address of this station
 
 AsyncWebServer server(80);
 
-String get_time_str(uint32_t sec, bool days)
+#if USE_SPRINTF
+static char *get_time_str(uint32_t sec, bool also_days)
+{
+    static char buf[32];
+    uint8_t seconds = (sec % 60);
+    uint8_t minutes = (sec % 3600) / 60;
+    uint32_t hours = (sec % 86400) / 3600;
+    uint32_t days = (sec % (86400 * 30)) / 86400;
+    if (also_days)
+        sprintf(buf, "%d:%d:%d:%d", days, hours, minutes, seconds);
+    else
+        sprintf(buf, "%d:%d:%d", hours, minutes, seconds);
+    return buf;
+}
+
+void get_webserver_response_html()
+{
+    webtext_root[sizeof(webtext_root) - 1] = 0xFF;
+    char *p = webtext_root;
+    // Make this web page auto-refresh every 5 sec
+    p += sprintf(p, "<!DOCTYPE html><html><head><meta http-equiv=\"refresh\" content=\"5\"></head><body><pre>");
+    p += sprintf(p, "\nVER = " FIRMWARE_VERSION);
+    p += sprintf(p, "\nID = %s", wdata.id.c_str());
+    p += sprintf(p, "\nTAG = %s", wdata.tag.c_str());
+    p += sprintf(p, "\nstatus = %d", wdata.status);
+    p += sprintf(p, "\nuptime = %s", get_time_str(wdata.seconds, true));
+    p += sprintf(p, "\nreconnects = %d", reconnects);
+    p += sprintf(p, "\nRSSI = %d", WiFi.RSSI()); // Signal strength
+    p += sprintf(p, "\nGPIO23 = %d", wdata.gpio23);
+    p += sprintf(p, "\nINT_C = %4.1f", (temprature_sens_read() - 32) / 1.8);
+    p += sprintf(p, "\ntemp_valid = %d", wdata.temp_valid);
+    p += sprintf(p, "\ntemp_c = %4.1f", wdata.temp_c);
+    p += sprintf(p, "\ntemp_f = %4.1f", wdata.temp_f);
+    p += sprintf(p, "\next_server = %s", wdata.ext_server.c_str());;
+    p += sprintf(p, "\next_read_sec = %d", wdata.ext_read_sec);
+    p += sprintf(p, "\next_valid = %d", wdata.ext_valid);
+    p += sprintf(p, "\next_temp_c = %4.1f", wdata.ext_temp_c);
+    p += sprintf(p, "\next_temp_f = %4.1f", wdata.ext_temp_f);
+    p += sprintf(p, "\nrelays = %d", wdata.relays);
+    p += sprintf(p, "\nfan_on = %d", !!(~wdata.relays & PIN_FAN));
+    p += sprintf(p, "\ncool_on = %d", !!(~wdata.relays & PIN_COOL));
+    p += sprintf(p, "\nheat_on = %d", !!(~wdata.relays & PIN_HEAT));
+    p += sprintf(p, "\nmaster_on = %d", !!(~wdata.relays & PIN_MASTER));
+    p += sprintf(p, "\nfan_mode = %d", wdata.fan_mode);
+    p += sprintf(p, "\nac_mode = %d", wdata.ac_mode);
+    p += sprintf(p, "\ncool_to = %d", wdata.cool_to);
+    p += sprintf(p, "\nheat_to = %d", wdata.heat_to);
+    p += sprintf(p, "\nhyst_trigger = %4.1f", wdata.hyst_trigger);
+    p += sprintf(p, "\nhyst_release = %4.1f", wdata.hyst_release);
+    p += sprintf(p, "\nfilter_sec = %d", wdata.filter_sec);
+    p += sprintf(p, "\ncool_sec = %d", wdata.cool_sec);
+    p += sprintf(p, "\nheat_sec = %d", wdata.heat_sec);
+    p += sprintf(p, "\nfilter_hms = %s", get_time_str(wdata.filter_sec, false));
+    p += sprintf(p, "\ncool_hms = %s", get_time_str(wdata.cool_sec, false));
+    p += sprintf(p, "\nheat_hms = %s", get_time_str(wdata.heat_sec, false));
+    p += sprintf(p, "\nstack_watermarks = %d,%d,%d,%d", wdata.task_1s, wdata.task_i2c, wdata.task_control, wdata.task_gpio);
+    p += sprintf(p, "</pre></body></html>\n");
+
+    if (webtext_root[sizeof(webtext_root) - 1] != 0xFF)
+        wdata.status |= STATUS_BUF_OVERFLOW;
+}
+
+void get_webserver_response_json()
+{
+    webtext_root[sizeof(webtext_json) - 1] = 0xFF;
+    char *p = webtext_json;
+
+    p += sprintf(p, "{");
+    p += sprintf(p, " \"id\":\"%s\"", wdata.id.c_str());
+    p += sprintf(p, ", \"tag\":\"%s\"", wdata.tag.c_str());
+    p += sprintf(p, ", \"uptime\":%d", wdata.seconds);
+    p += sprintf(p, ", \"status\":%d", wdata.status);
+    // Json returns only the effective temperature (internal or external sensor)
+    p += sprintf(p, ", \"temp_valid\":%d", wdata.get_temp_valid());
+    if (wdata.get_temp_valid()) // Add the temperature valid only if it is valid
+    {
+        p += sprintf(p, ", \"temp_c\":%4.1f", wdata.get_temp_c());
+        p += sprintf(p, ", \"temp_f\":%4.1f", wdata.get_temp_f());
+    }
+    p += sprintf(p, ", \"relays\":%d", wdata.relays);
+    p += sprintf(p, ", \"fan_on\":%d", !!(~wdata.relays & PIN_FAN));
+    p += sprintf(p, ", \"cool_on\":%d", !!(~wdata.relays & PIN_COOL));
+    p += sprintf(p, ", \"heat_on\":%d", !!(~wdata.relays & PIN_HEAT));
+    p += sprintf(p, ", \"master_on\":%d", !!(~wdata.relays & PIN_MASTER));
+    p += sprintf(p, ", \"fan_mode\":%d", wdata.fan_mode);
+    p += sprintf(p, ", \"ac_mode\":%d", wdata.ac_mode);
+    p += sprintf(p, ", \"cool_to\":%d", wdata.cool_to);
+    p += sprintf(p, ", \"heat_to\":%d", wdata.heat_to);
+    p += sprintf(p, ", \"filter_sec\":%d", wdata.filter_sec);
+    p += sprintf(p, ", \"cool_sec\":%d", wdata.cool_sec);
+    p += sprintf(p, ", \"heat_sec\":%d", wdata.heat_sec);
+    p += sprintf(p, " }");
+
+    if (webtext_json[sizeof(webtext_json) - 1] != 0xFF)
+        wdata.status |= STATUS_BUF_OVERFLOW;
+}
+
+#else // USE_SPRINTF
+
+String get_time_str(uint32_t sec, bool also_days)
 {
     uint32_t seconds = (sec % 60);
     uint32_t minutes = (sec % 3600) / 60;
     uint32_t hours = (sec % 86400) / 3600;
-    if (days)
-    {
-        uint32_t days = (sec % (86400 * 30)) / 86400;
+    uint32_t days = (sec % (86400 * 30)) / 86400;
+    if (also_days)
         return String(days) + ":" + String(hours) + ":" + String(minutes) + ":" + String(seconds);
-    }
     return String(hours) + ":" + String(minutes) + ":" + String(seconds);
 }
 
@@ -44,7 +148,6 @@ void get_webserver_response_html()
     webtext_root += "\nVER = " + String(FIRMWARE_VERSION);
     webtext_root += "\nID = " + wdata.id;
     webtext_root += "\nTAG = " + wdata.tag;
-    webtext_root += "\nMAC = " + wifi_mac;
     webtext_root += "\nstatus = " + String(wdata.status);
     webtext_root += "\nuptime = " + get_time_str(wdata.seconds, true);
     webtext_root += "\nreconnects = " + String(reconnects);
@@ -109,6 +212,8 @@ void get_webserver_response_json()
     webtext_json += ", \"heat_sec\":" + String(wdata.heat_sec);
     webtext_json += " }";
 }
+
+#endif // USE_SPRINTF
 
 void handleRoot(AsyncWebServerRequest *request)
 {
@@ -303,7 +408,6 @@ void setup_wifi()
     if (wdata.gpio23)
         ip[3] = 41; // Assign 192.168.1.41 to the "development" board via strap
     WiFi.config(ip, gateway, subnet);
-    wifi_mac = WiFi.macAddress();
 
     // Wait for connection
     while (WiFi.status() != WL_CONNECTED)
