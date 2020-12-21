@@ -1,7 +1,7 @@
 #include <Arduino.h>
 
 // The version string shown in stats. Nothing depends on it and it is used only to confirm newly flashed firmware.
-#define FIRMWARE_VERSION "1.03"
+#define FIRMWARE_VERSION "1.04"
 
 // Set to 1 to use temperature model for testing (insted of the real temperature value)
 #define USE_MODEL 0
@@ -71,11 +71,11 @@ struct StationData
 extern StationData wdata;
 
 // Possible errors
-#define STATUS_LCD_INIT_ERROR  0x0001 // LCD was not able to initialize
-#define STATUS_EXT_GET_ERROR   0x0002 // Http GET error when reading external sensor
-#define STATUS_EXT_JSON_ERROR  0x0004 // Error parsing external temperature json response
-#define STATUS_EXT_TEMP_ERROR  0x0008 // Error reading external temperature sensor
-#define STATUS_BUF_OVERFLOW    0x000C // Web response buffer overflowed
+#define STATUS_LCD_INIT_ERROR  (1 << 0) // LCD was not able to initialize
+#define STATUS_EXT_GET_ERROR   (1 << 1) // Http GET error when reading external sensor
+#define STATUS_EXT_JSON_ERROR  (1 << 2) // Error parsing external temperature json response
+#define STATUS_EXT_TEMP_ERROR  (1 << 3) // Error reading external temperature sensor
+#define STATUS_BUF_OVERFLOW    (1 << 4) // Web response buffer overflowed
 
 // Specific to ESP32's FreeRTOS port, Arduino loop is running on core 1 and priority 1
 #define PRO_CPU 0
