@@ -362,7 +362,7 @@ void setup_ota()
         // Serial.printf("Uploading: index=%d len=%d final=%d\n", index, len, final);
         if (index == 0)
         {
-            //Serial.printf("Uploading: %s\n", filename.c_str());
+            Serial.printf("Uploading: %s\n", filename.c_str());
             if (!Update.begin(UPDATE_SIZE_UNKNOWN)) // start with max available size
                 Update.printError(Serial);
         }
@@ -375,7 +375,7 @@ void setup_ota()
         {
             if (Update.end(true)) // true to set the size to the current progress
             {
-                //Serial.println("Flash OK, rebooting...\n");
+                Serial.println("Flash OK, rebooting...\n");
                 ESP.restart();
             }
             else
@@ -412,15 +412,15 @@ void setup_wifi()
     // Wait for connection
     while (WiFi.status() != WL_CONNECTED)
     {
-        //Serial.print(".");
+        Serial.print(".");
         delay(500);
     }
-    //Serial.printf("\nConnected to %s\nIP address: ", ssid);
-    //Serial.println(WiFi.localIP());
+    Serial.printf("\nConnected to %s\nIP address: ", ssid);
+    Serial.println(WiFi.localIP());
     reconnects++;
 
     if (MDNS.begin("esp32"));
-        //Serial.println("MDNS responder started");
+        Serial.println("MDNS responder started");
 }
 
 void setup_webserver()
@@ -438,7 +438,7 @@ void wifi_check_loop()
 
     if (WiFi.status() != WL_CONNECTED)
     {
-        //Serial.println("Server disconnected! Reconnecting...");
+        Serial.println("Server disconnected! Reconnecting...");
         setup_wifi();
     }
 }
