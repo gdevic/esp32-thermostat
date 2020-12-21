@@ -37,8 +37,11 @@ static bool get_external_temp()
     // Read a line of the reply from server which should be a line of json data
     while(client.available())
     {
-        String line = client.readStringUntil('\r');
+        String line = client.readStringUntil('\n');
+        line.trim();
         const char *json = line.c_str();
+        if (json[0] != '{')
+            continue; // Parse only JSON lines
         DeserializationError error = deserializeJson(doc, json);
         if (error)
         {
