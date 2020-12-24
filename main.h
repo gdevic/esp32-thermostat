@@ -6,6 +6,9 @@
 // Set to 1 to use temperature model for testing (insted of the real temperature value)
 #define USE_MODEL 0
 
+// The number of seconds that the option mode will wait before going back to displaying temperatures
+#define OPTION_MODE_COUNTER_SEC 5
+
 struct StationData
 {
     // Variables marked with [NV] are held in the non-volatile memory using Preferences

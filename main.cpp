@@ -121,7 +121,7 @@ static void vTask_gpio(void* arg)
                 wdata.option = wdata.option + 1;
                 if (wdata.option > OPTION_LAST)
                     wdata.option = OPTION_OFF;
-                option_mode_counter = 7;
+                option_mode_counter = OPTION_MODE_COUNTER_SEC;
 
                 // Display the current options on the LCD
                 xI2CMessage xMessage;
@@ -131,14 +131,18 @@ static void vTask_gpio(void* arg)
             else // When the options are setting up fan, up or down buttons change fan mode
             if (wdata.option == OPTION_FAN)
             {
-                control.set_fan_mode(wdata.fan_mode + 1);
-                option_mode_counter = 7;
+                // To make the physical UI as simple as possible, we limit the fan options to ON/OFF only
+                if (wdata.fan_mode == OPTION_OFF)
+                    control.set_fan_mode(OPTION_FAN); // OFF goes to ON
+                else
+                    control.set_fan_mode(OPTION_OFF); // while anything else goes to OFF
+                option_mode_counter = OPTION_MODE_COUNTER_SEC;
             }
             else // When the options are setting the A/C mode, up or down buttons change it
             if (wdata.option == OPTION_AC)
             {
                 control.set_ac_mode(wdata.ac_mode + 1);
-                option_mode_counter = 7;
+                option_mode_counter = OPTION_MODE_COUNTER_SEC;
             }
             else // Otherwise, up or down buttons, as expected, change the temperature
             {
