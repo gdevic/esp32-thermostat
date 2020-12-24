@@ -16,10 +16,10 @@ struct StationData
     String tag;           // [NV] Station description or a tag, held in the non-volatile memory
     float temp_c;         // Current temperature in "C"
     float temp_f;         // Current temperature in "F"
-    bool temp_valid;      // True if termperature reading is correct
+    bool temp_valid {0};  // True if termperature reading is correct
     float ext_temp_c;     // External sensor temperature in "C"
     float ext_temp_f;     // External sensor temperature in "F"
-    bool ext_valid;       // True if external sensor termperature reading is correct
+    bool ext_valid  {0};  // True if external sensor termperature reading is correct
     String ext_server;    // [NV] Server/path name of the external temperature sensor
     uint32_t ext_read_sec;// [NV] Period in seconds to read external temperature sensor, 0 to disable reading
 
@@ -29,7 +29,7 @@ struct StationData
     inline float get_temp_f() { return ext_valid ? ext_temp_f : temp_f; }
     inline bool get_temp_valid() { return ext_valid ? true : temp_valid; }
 
-    uint8_t option { 0 }; // UI option mode
+    uint8_t option {0};   // UI option mode
 #define OPTION_OFF    0   // No option
 #define OPTION_FAN    1   // Setting the fan mode
 #define OPTION_AC     2   // Setting the AC mode
@@ -55,20 +55,20 @@ struct StationData
     float hyst_trigger;   // [NV] Hysteresis trigger temperature delta
     float hyst_release;   // [NV] Hysteresis release temperature delta
 
-    uint32_t seconds;     // Uptime seconds counter (shown as "uptime" in web reports)
+    uint32_t seconds {0}; // Uptime seconds counter (shown as "uptime" in web reports)
     uint32_t filter_sec;  // [NV] Total A/C + fan on time in seconds
     uint32_t cool_sec;    // [NV] Total A/C cooling time in seconds
     uint32_t heat_sec;    // [NV] Total A/C heating time in seconds
     uint32_t status;      // Bitfield containing possible errors and status bits
-    uint8_t relays { 0xFF }; // Effective state of the relay control byte
+    uint8_t relays {0xFF};// Effective state of the relay control byte
     bool gpio23;          // GPIO23 strap value
 
     // Debug methods
-    int task_1s {-1};     // Stack high watermark for the named task
-    int task_i2c {-1};    // Stack high watermark for the named task
-    int task_control {-1};// Stack high watermark for the named task
-    int task_gpio {-1};   // Stack high watermark for the named task
-    int task_ext {-1};    // Stack high watermark for the named task
+    int task_1s {-1};     // Stack high watermark for the corresponding task
+    int task_i2c {-1};    // Stack high watermark for the corresponding task
+    int task_control {-1};// Stack high watermark for the corresponding task
+    int task_gpio {-1};   // Stack high watermark for the corresponding task
+    int task_ext {-1};    // Stack high watermark for the corresponding task
 };
 
 extern StationData wdata;
