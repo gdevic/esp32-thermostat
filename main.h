@@ -98,6 +98,7 @@ typedef struct
 #define I2C_PRINT_AC       4
 #define I2C_PRINT_TARGET   5
 #define I2C_PRINT_OPTIONS  6
+#define I2C_ANIMATE_FAN    7
 
 extern QueueHandle_t xI2CQueue; // The queue of messages to the I2C task
 

@@ -33,9 +33,14 @@ LiquidCrystal_PCF8574 lcd(0x27); // Set the I2C LCD address
 static int customCharSelect[] = { B00000, B00000, B00000, B01101, B11010, B00000, B01101, B11010 };
 static int customCharDown[]   = { B00000, B00000, B11111, B11111, B01110, B01110, B00100, B00100 };
 static int customCharUp[]     = { B00000, B00000, B00100, B00100, B01110, B01110, B11111, B11111 };
+static int customCharFan1[]   = { B00000, B00000, B00000, B01100, B00101, B11011, B10100, B00110 };
+static int customCharFan2[]   = { B00000, B00000, B00000, B00010, B11010, B00100, B01011, B01000 };
+
 #define CHAR_SELECT  0
 #define CHAR_DOWN    1
 #define CHAR_UP      2
+#define CHAR_FAN1    3
+#define CHAR_FAN2    4
 
 // The maximum number of messages that can be waiting for I2C task at any one time
 #define I2C_QUEUE_SIZE 5
@@ -62,6 +67,8 @@ static void lcd_init()
     lcd.createChar(CHAR_SELECT, customCharSelect);
     lcd.createChar(CHAR_DOWN, customCharDown);
     lcd.createChar(CHAR_UP, customCharUp);
+    lcd.createChar(CHAR_FAN1, customCharFan1);
+    lcd.createChar(CHAR_FAN2, customCharFan2);
     lcd.clear();
     lcd.setBacklight(1);
 
@@ -230,7 +237,7 @@ void pref_set(const char* name, String value)
 static void vTask_1s_tick(void *p)
 {
     // Make this task sleep and awake once a second
-    const TickType_t xFrequency = 1 * 1000 / portTICK_PERIOD_MS;
+    const TickType_t xTimePeriod = 1 * 1000 / portTICK_PERIOD_MS;
     TickType_t xLastWakeTime = xTaskGetTickCount();
     xI2CMessage xMessage;
     bool changed = false; // Commit updates to filter counters only on change
@@ -238,11 +245,10 @@ static void vTask_1s_tick(void *p)
     while(true)
     {
         // Wait for the next cycle first, all calculation below will be triggered after the initial period passed
-        vTaskDelayUntil(&xLastWakeTime, xFrequency);
-        wdata.seconds++;
+        vTaskDelayUntil(&xLastWakeTime, xTimePeriod);
 
-        // Once every 5 seconds, read temperature sensor
-        if ((wdata.seconds % 5) == 0)
+        // Once every 30 seconds, read the temperature sensor
+        if ((wdata.seconds % 30) == 0)
         {
             xMessage.xMessageType = I2C_READ_TEMP;
             xQueueSend(xI2CQueue, &xMessage, portMAX_DELAY);
@@ -276,6 +282,12 @@ static void vTask_1s_tick(void *p)
             }
         }
 
+        // Animate the fan icon
+        xI2CMessage xMessage;
+        xMessage.xMessageType = I2C_ANIMATE_FAN;
+        xQueueSend(xI2CQueue, &xMessage, portMAX_DELAY);
+
+        wdata.seconds++;
         wdata.task_1s = uxTaskGetStackHighWaterMark(nullptr);
     }
 }
@@ -368,6 +380,15 @@ static void vTask_I2C(void *p)
                 lcd.print("heat to " + String(wdata.heat_to));
             else if (wdata.ac_mode == AC_MODE_AUTO)
                 lcd.print("auto " + String(wdata.cool_to) + "/" + String(wdata.heat_to));
+        }
+
+        if (xMessage.xMessageType == I2C_ANIMATE_FAN)
+        {
+            lcd.setCursor(0, 1);
+            if (wdata.fan_mode == OPTION_OFF)
+                lcd.write(' ');
+            else
+                lcd.write((wdata.seconds & 1) ? CHAR_FAN1 : CHAR_FAN2);
         }
 
         wdata.task_i2c = uxTaskGetStackHighWaterMark(nullptr);

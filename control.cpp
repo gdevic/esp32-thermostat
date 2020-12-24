@@ -4,13 +4,13 @@
 static void vTask_control(void *p)
 {
     // Make this task sleep and awake once a second
-    const TickType_t xFrequency = 1 * 1000 / portTICK_PERIOD_MS;
+    const TickType_t xTimePeriod = 1 * 1000 / portTICK_PERIOD_MS;
     TickType_t xLastWakeTime = xTaskGetTickCount();
 
     while(true)
     {
         // Once a second call the control class' tick method
-        vTaskDelayUntil(&xLastWakeTime, xFrequency);
+        vTaskDelayUntil(&xLastWakeTime, xTimePeriod);
         static_cast<CControl *>(p)->tick();
 
         wdata.task_control = uxTaskGetStackHighWaterMark(nullptr);
