@@ -22,7 +22,7 @@ CControl::CControl()
     xTaskCreatePinnedToCore(
         vTask_control,       // Task function
         "task_control",      // Name of the task
-        2048,                // Stack size in bytes
+        1024,                // Stack size in bytes
         this,                // Parameter passed as input to the task
         tskIDLE_PRIORITY + 2,// Priority of the task
         nullptr,             // Task handle
