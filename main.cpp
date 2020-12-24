@@ -30,10 +30,10 @@ DallasTemperature sensors(&oneWire);
 LiquidCrystal_PCF8574 lcd(0x27); // Set the I2C LCD address
 
 // Custom char generator: https://maxpromer.github.io/LCD-Character-Creator
-static int customCharAir[]    = { B00000, B00000, B00000, B01101, B11010, B00000, B01101, B11010 };
+static int customCharSelect[] = { B00000, B00000, B00000, B01101, B11010, B00000, B01101, B11010 };
 static int customCharDown[]   = { B00000, B00000, B11111, B11111, B01110, B01110, B00100, B00100 };
 static int customCharUp[]     = { B00000, B00000, B00100, B00100, B01110, B01110, B11111, B11111 };
-#define CHAR_AIR     0
+#define CHAR_SELECT  0
 #define CHAR_DOWN    1
 #define CHAR_UP      2
 
@@ -59,7 +59,7 @@ static void lcd_init()
         wdata.status |= STATUS_LCD_INIT_ERROR;
 
     lcd.begin(16, 2);
-    lcd.createChar(CHAR_AIR, customCharAir);
+    lcd.createChar(CHAR_SELECT, customCharSelect);
     lcd.createChar(CHAR_DOWN, customCharDown);
     lcd.createChar(CHAR_UP, customCharUp);
     lcd.clear();
@@ -69,7 +69,7 @@ static void lcd_init()
     lcd.print("Init");
 
     lcd.setCursor(9, 1);
-    lcd.write(uint8_t(CHAR_AIR));
+    lcd.write(uint8_t(CHAR_SELECT));
     lcd.setCursor(12, 1);
     lcd.write(uint8_t(CHAR_DOWN));
     lcd.setCursor(15, 1);
