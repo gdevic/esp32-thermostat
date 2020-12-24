@@ -287,7 +287,9 @@ static void vTask_1s_tick(void *p)
         xMessage.xMessageType = I2C_ANIMATE_FAN;
         xQueueSend(xI2CQueue, &xMessage, portMAX_DELAY);
 
-        wdata.seconds++;
+        wdata.seconds++; // Increment the uptime seconds ticker
+        if (wdata.timestamp) // Increment the unix timestamp only if it has been set
+            wdata.timestamp++;
         wdata.task_1s = uxTaskGetStackHighWaterMark(nullptr);
     }
 }

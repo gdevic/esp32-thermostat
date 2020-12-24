@@ -56,6 +56,7 @@ struct StationData
     float hyst_release;   // [NV] Hysteresis release temperature delta
 
     uint32_t seconds {0}; // Uptime seconds counter (shown as "uptime" in web reports)
+    uint32_t timestamp {0};// Unix timestamp date/time (shown as "timestamp" in web reports)
     uint32_t filter_sec;  // [NV] Total A/C + fan on time in seconds
     uint32_t cool_sec;    // [NV] Total A/C cooling time in seconds
     uint32_t heat_sec;    // [NV] Total A/C heating time in seconds

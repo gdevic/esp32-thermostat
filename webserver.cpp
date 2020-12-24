@@ -50,6 +50,7 @@ void get_webserver_response_html()
 {
     webtext_root[sizeof(webtext_root) - 1] = 0xFF;
     char *p = webtext_root;
+    const time_t timestamp = wdata.timestamp;
     // Make this web page auto-refresh every 5 sec
     p += sprintf(p, "<!DOCTYPE html><html><head><meta http-equiv=\"refresh\" content=\"5\"></head><body><pre>");
     p += sprintf(p, "\nVER = " FIRMWARE_VERSION);
@@ -57,6 +58,7 @@ void get_webserver_response_html()
     p += sprintf(p, "\nTAG = %s", wdata.tag.c_str());
     p += sprintf(p, "\nstatus = %d", wdata.status);
     p += sprintf(p, "\nuptime = %s", get_time_str(wdata.seconds, true));
+    p += sprintf(p, "\ntimestamp = %s", ctime(&timestamp));
     p += sprintf(p, "\nreconnects = %d", reconnects);
     p += sprintf(p, "\nRSSI = %d", WiFi.RSSI()); // Signal strength
     p += sprintf(p, "\nGPIO23 = %d", wdata.gpio23);
@@ -284,6 +286,7 @@ void handleSet(AsyncWebServerRequest *request)
     ok |= get_parse_value(request, "cool_to", u8, false);
     ok |= get_parse_value(request, "heat_to", u8, false);
     ok |= get_parse_value(request, "status", wdata.status, false);
+    ok |= get_parse_value(request, "timestamp", wdata.timestamp, false);
     if (!ok)
         request->send(400, "text/html", "Invalid request");
     else
