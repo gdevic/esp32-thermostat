@@ -129,11 +129,6 @@ static void vTask_gpio(void* arg)
                 if (wdata.option > OPTION_LAST)
                     wdata.option = OPTION_OFF;
                 option_mode_counter = OPTION_MODE_COUNTER_SEC;
-
-                // Display the current options on the LCD
-                xI2CMessage xMessage;
-                xMessage.xMessageType = I2C_PRINT_OPTIONS;
-                xQueueSend(xI2CQueue, &xMessage, portMAX_DELAY);
             }
             else // When the options are setting up fan, up or down buttons change fan mode
             if (wdata.option == OPTION_FAN)
@@ -161,14 +156,13 @@ static void vTask_gpio(void* arg)
                     if (wdata.ac_mode == AC_MODE_HEAT)
                         control.set_heat_to(wdata.heat_to + delta);
                     if (wdata.ac_mode == AC_MODE_AUTO)
-                    {
-                        // Display the current A/C target on the LCD
-                        xI2CMessage xMessage;
-                        xMessage.xMessageType = I2C_PRINT_TARGET;
-                        xQueueSend(xI2CQueue, &xMessage, portMAX_DELAY);
-                    }
+                        ; // TODO
                 }
             }
+
+            xI2CMessage xMessage;
+            xMessage.xMessageType = I2C_PRINT_STATUS;
+            xQueueSend(xI2CQueue, &xMessage, portMAX_DELAY);
         }
 
         wdata.task_gpio = uxTaskGetStackHighWaterMark(nullptr);
@@ -277,7 +271,7 @@ static void vTask_1s_tick(void *p)
 
                 // Display the current options on the LCD
                 xI2CMessage xMessage;
-                xMessage.xMessageType = I2C_PRINT_OPTIONS;
+                xMessage.xMessageType = I2C_PRINT_STATUS;
                 xQueueSend(xI2CQueue, &xMessage, portMAX_DELAY);
             }
         }
@@ -316,7 +310,7 @@ static void vTask_I2C(void *p)
 
             wdata.relays = xMessage.bMessage;
         }
-        if (xMessage.xMessageType == I2C_READ_TEMP)
+        else if (xMessage.xMessageType == I2C_READ_TEMP)
         {
             // Read temperature sensor
             sensors.requestTemperatures();
@@ -334,61 +328,46 @@ static void vTask_I2C(void *p)
             lcd.print(String(int(wdata.get_temp_f() + 0.5), DEC));
             lcd.print(wdata.get_temp_valid() ? " F" : " ?");
         }
-        if (xMessage.xMessageType == I2C_LCD_INIT)
+        else if (xMessage.xMessageType == I2C_LCD_INIT)
         {
             lcd_init();
         }
-
-        bool also_display_fan = false;
-        bool also_display_ac = false;
-        bool also_display_target = false;
-
-        if (xMessage.xMessageType == I2C_PRINT_OPTIONS)
+        else if (xMessage.xMessageType == I2C_PRINT_STATUS)
         {
             lcd.setCursor(6, 0);
             if (wdata.option == OPTION_OFF)
-                lcd.print("      "), also_display_target = true;
-            if (wdata.option == OPTION_FAN)
-                lcd.print("  Fan "), also_display_fan = true;
-            if (wdata.option == OPTION_AC)
-                lcd.print("  A/C "), also_display_ac = true;
+            {
+                if (wdata.ac_mode == AC_MODE_OFF)
+                    lcd.print("          ");
+                else if (wdata.ac_mode == AC_MODE_COOL)
+                    lcd.print("cool to " + String(wdata.cool_to));
+                else if (wdata.ac_mode == AC_MODE_HEAT)
+                    lcd.print("heat to " + String(wdata.heat_to));
+                else if (wdata.ac_mode == AC_MODE_AUTO)
+                    lcd.print("auto " + String(wdata.cool_to) + "/" + String(wdata.heat_to));
+            }
+            else if (wdata.option == OPTION_FAN)
+            {
+                if (wdata.fan_mode == FAN_MODE_OFF)
+                    lcd.print("  Fan OFF ");
+                else if (wdata.fan_mode == FAN_MODE_ON)
+                    lcd.print("  Fan ON  ");
+                else if (wdata.fan_mode == FAN_MODE_CYC)
+                    lcd.print("  Fan CYC ");
+            }
+            else if (wdata.option == OPTION_AC)
+            {
+                if (wdata.ac_mode == AC_MODE_OFF)
+                    lcd.print("  A/C OFF ");
+                else if (wdata.ac_mode == AC_MODE_COOL)
+                    lcd.print("  A/C COOL");
+                else if (wdata.ac_mode == AC_MODE_HEAT)
+                    lcd.print("  A/C HEAT");
+                else if (wdata.ac_mode == AC_MODE_AUTO)
+                    lcd.print("  A/C AUTO");
+            }
         }
-        if ((xMessage.xMessageType == I2C_PRINT_FAN) || also_display_fan)
-        {
-            lcd.setCursor(12, 0);
-            if (wdata.fan_mode == FAN_MODE_OFF)
-                lcd.print("OFF ");
-            else if (wdata.fan_mode == FAN_MODE_ON)
-                lcd.print("ON  ");
-            else if (wdata.fan_mode == FAN_MODE_CYC)
-                lcd.print("CYC ");
-        }
-        if ((xMessage.xMessageType == I2C_PRINT_AC) || also_display_ac)
-        {
-            lcd.setCursor(12, 0);
-            if (wdata.ac_mode == AC_MODE_OFF)
-                lcd.print("OFF ");
-            else if (wdata.ac_mode == AC_MODE_COOL)
-                lcd.print("COOL");
-            else if (wdata.ac_mode == AC_MODE_HEAT)
-                lcd.print("HEAT");
-            else if (wdata.ac_mode == AC_MODE_AUTO)
-                lcd.print("AUTO");
-        }
-        if ((xMessage.xMessageType == I2C_PRINT_TARGET) || also_display_target)
-        {
-            lcd.setCursor(6, 0);
-            if (wdata.ac_mode == AC_MODE_OFF)
-                lcd.print("          ");
-            else if (wdata.ac_mode == AC_MODE_COOL)
-                lcd.print("cool to " + String(wdata.cool_to));
-            else if (wdata.ac_mode == AC_MODE_HEAT)
-                lcd.print("heat to " + String(wdata.heat_to));
-            else if (wdata.ac_mode == AC_MODE_AUTO)
-                lcd.print("auto " + String(wdata.cool_to) + "/" + String(wdata.heat_to));
-        }
-
-        if (xMessage.xMessageType == I2C_ANIMATE_FAN)
+        else if (xMessage.xMessageType == I2C_ANIMATE_FAN)
         {
             lcd.setCursor(0, 1);
             if (wdata.fan_mode == OPTION_OFF)

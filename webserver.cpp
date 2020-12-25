@@ -295,9 +295,9 @@ void handleSet(AsyncWebServerRequest *request)
     else
     {
         if (request->arg("fan_mode").length())
-            control.set_fan_mode(u8, false);
+            control.set_fan_mode(u8);
         else if (request->arg("ac_mode").length())
-            control.set_ac_mode(u8, false);
+            control.set_ac_mode(u8);
         else if (request->arg("cool_to").length())
             control.set_cool_to(u8);
         else if (request->arg("heat_to").length())

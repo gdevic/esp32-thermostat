@@ -122,7 +122,7 @@ void CControl::tick()
     }
 }
 
-void CControl::set_fan_mode(uint8_t mode, bool by_button)
+void CControl::set_fan_mode(uint8_t mode)
 {
     if (mode > FAN_MODE_LAST)
         mode = FAN_MODE_OFF;
@@ -134,43 +134,19 @@ void CControl::set_fan_mode(uint8_t mode, bool by_button)
     // Set the new value into an NV variable
     pref_set("fan_mode", mode);
 
-    // Display the current fan mode on the LCD
-    if (by_button)
-    {
-        xI2CMessage xMessage;
-        xMessage.xMessageType = I2C_PRINT_FAN;
-        xQueueSend(xI2CQueue, &xMessage, portMAX_DELAY);
-    }
-
     // Initiate fan change
     m_fan_counter = 5; // 5 sec to fan change
     m_fan_mode = mode;
     wdata.fan_mode = mode;
 }
 
-void CControl::set_ac_mode(uint8_t mode, bool by_button)
+void CControl::set_ac_mode(uint8_t mode)
 {
     if (mode > AC_MODE_LAST)
         mode = AC_MODE_OFF;
 
     // Set the new value into an NV variable
     pref_set("ac_mode", mode);
-
-    // Display the current A/C mode on the LCD
-    if (by_button)
-    {
-        xI2CMessage xMessage;
-        xMessage.xMessageType = I2C_PRINT_AC;
-        xQueueSend(xI2CQueue, &xMessage, portMAX_DELAY);
-    }
-    else // If the request came from a web client, clear the options and print the target temperature
-    {
-        wdata.option = OPTION_OFF;
-
-        xI2CMessage xMessage;
-        xMessage.xMessageType = I2C_PRINT_OPTIONS;
-        xQueueSend(xI2CQueue, &xMessage, portMAX_DELAY);
-    }
 
     // Initiate A/C change
     m_ac_counter = 30; // 30 sec to A/C mode change
@@ -185,11 +161,6 @@ void CControl::set_cool_to(uint8_t temp)
     // Set the new value into an NV variable
     pref_set("cool_to", temp);
 
-    // Display the current A/C target on the LCD
-    xI2CMessage xMessage;
-    xMessage.xMessageType = I2C_PRINT_TARGET;
-    xQueueSend(xI2CQueue, &xMessage, portMAX_DELAY);
-
     // Initiate A/C change
     m_ac_counter = 30; // 30 sec to A/C mode change
     wdata.cool_to = temp;
@@ -201,11 +172,6 @@ void CControl::set_heat_to(uint8_t temp)
 
     // Set the new value into an NV variable
     pref_set("heat_to", temp);
-
-    // Display the current A/C target on the LCD
-    xI2CMessage xMessage;
-    xMessage.xMessageType = I2C_PRINT_TARGET;
-    xQueueSend(xI2CQueue, &xMessage, portMAX_DELAY);
 
     // Initiate A/C change
     m_ac_counter = 30; // 30 sec to A/C mode change

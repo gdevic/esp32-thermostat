@@ -94,14 +94,11 @@ typedef struct
     uint8_t bMessage;
 } xI2CMessage;
 
-#define I2C_LCD_INIT       0
-#define I2C_READ_TEMP      1
-#define I2C_SET_RELAYS     2
-#define I2C_PRINT_FAN      3
-#define I2C_PRINT_AC       4
-#define I2C_PRINT_TARGET   5
-#define I2C_PRINT_OPTIONS  6
-#define I2C_ANIMATE_FAN    7
+#define I2C_LCD_INIT      0
+#define I2C_READ_TEMP     1
+#define I2C_SET_RELAYS    2
+#define I2C_PRINT_STATUS  3
+#define I2C_ANIMATE_FAN   4
 
 extern QueueHandle_t xI2CQueue; // The queue of messages to the I2C task
 
