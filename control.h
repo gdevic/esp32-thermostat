@@ -11,8 +11,8 @@ class CControl
 public:
     CControl();
     void tick();
-    void set_fan_mode(uint8_t mode);
-    void set_ac_mode(uint8_t mode);
+    void set_fan_mode(uint8_t mode, bool by_button = true);
+    void set_ac_mode(uint8_t mode, bool by_button = true);
     void set_cool_to(uint8_t temp);
     void set_heat_to(uint8_t temp);
     bool accounting(uint8_t relays);

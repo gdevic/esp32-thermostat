@@ -77,6 +77,7 @@ void get_webserver_response_html()
     p += sprintf(p, "\nheat_on = %d", !!(~wdata.relays & PIN_HEAT));
     p += sprintf(p, "\nmaster_on = %d", !!(~wdata.relays & PIN_MASTER));
     p += sprintf(p, "\nfan_mode = %d", wdata.fan_mode);
+    p += sprintf(p, "\nfan_sec = %d", wdata.fan_sec);
     p += sprintf(p, "\nac_mode = %d", wdata.ac_mode);
     p += sprintf(p, "\ncool_to = %d", wdata.cool_to);
     p += sprintf(p, "\nheat_to = %d", wdata.heat_to);
@@ -118,6 +119,7 @@ void get_webserver_response_json()
     p += sprintf(p, ", \"heat_on\":%d", !!(~wdata.relays & PIN_HEAT));
     p += sprintf(p, ", \"master_on\":%d", !!(~wdata.relays & PIN_MASTER));
     p += sprintf(p, ", \"fan_mode\":%d", wdata.fan_mode);
+    p += sprintf(p, ", \"fan_sec\":%d", wdata.fan_sec);
     p += sprintf(p, ", \"ac_mode\":%d", wdata.ac_mode);
     p += sprintf(p, ", \"cool_to\":%d", wdata.cool_to);
     p += sprintf(p, ", \"heat_to\":%d", wdata.heat_to);
@@ -282,6 +284,7 @@ void handleSet(AsyncWebServerRequest *request)
     ok |= get_parse_value(request, "heat_sec", wdata.heat_sec, true);
     // The following set of variables do not store their new value in NV
     ok |= get_parse_value(request, "fan_mode", u8, false);
+    ok |= get_parse_value(request, "fan_sec", wdata.fan_sec, false);
     ok |= get_parse_value(request, "ac_mode", u8, false);
     ok |= get_parse_value(request, "cool_to", u8, false);
     ok |= get_parse_value(request, "heat_to", u8, false);
@@ -292,9 +295,9 @@ void handleSet(AsyncWebServerRequest *request)
     else
     {
         if (request->arg("fan_mode").length())
-            control.set_fan_mode(u8);
+            control.set_fan_mode(u8, false);
         else if (request->arg("ac_mode").length())
-            control.set_ac_mode(u8);
+            control.set_ac_mode(u8, false);
         else if (request->arg("cool_to").length())
             control.set_cool_to(u8);
         else if (request->arg("heat_to").length())

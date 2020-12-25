@@ -35,11 +35,13 @@ struct StationData
 #define OPTION_AC     2   // Setting the AC mode
 #define OPTION_LAST   OPTION_AC
 
-    uint8_t fan_mode;     // [NV] Fan operation mode: OFF, ON, CYC
-#define FAN_MODE_OFF  0
-#define FAN_MODE_ON   1
-#define FAN_MODE_CYC  2
-#define FAN_MODE_LAST FAN_MODE_CYC
+    uint8_t fan_mode;     // [NV] Fan operation mode: OFF, ON, CYC, TIMED
+#define FAN_MODE_OFF   0
+#define FAN_MODE_ON    1
+#define FAN_MODE_CYC   2
+#define FAN_MODE_TIMED 3
+#define FAN_MODE_LAST FAN_MODE_TIMED
+    uint32_t fan_sec {0}; // Counter in seconds for the fan to turn itself off in TIMED mode
 
     uint8_t ac_mode;      // [NV] A/C mode
 #define AC_MODE_OFF   0

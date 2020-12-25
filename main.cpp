@@ -140,9 +140,9 @@ static void vTask_gpio(void* arg)
             {
                 // To make the physical UI as simple as possible, we limit the fan options to ON/OFF only
                 if (wdata.fan_mode == OPTION_OFF)
-                    control.set_fan_mode(OPTION_FAN); // OFF goes to ON
+                    control.set_fan_mode(FAN_MODE_ON); // OFF goes to ON
                 else
-                    control.set_fan_mode(OPTION_OFF); // while anything else goes to OFF
+                    control.set_fan_mode(FAN_MODE_OFF); // while anything else goes to OFF
                 option_mode_counter = OPTION_MODE_COUNTER_SEC;
             }
             else // When the options are setting the A/C mode, up or down buttons change it
@@ -281,6 +281,10 @@ static void vTask_1s_tick(void *p)
                 xQueueSend(xI2CQueue, &xMessage, portMAX_DELAY);
             }
         }
+
+        // If the TIMED fan mode completed, or it was not set up in the correct sequence, turn the fan off
+        if ((wdata.fan_mode == FAN_MODE_TIMED) && (wdata.fan_sec == 0))
+            control.set_fan_mode(FAN_MODE_OFF);
 
         // Animate the fan icon
         xI2CMessage xMessage;

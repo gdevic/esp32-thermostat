@@ -56,6 +56,13 @@ void CControl::tick()
                     m_fan_counter = 45 * 60; // and keep it off for 45 min
                 }
             }
+            else if ((m_fan_mode == FAN_MODE_TIMED) && (wdata.fan_sec > 0))
+            {
+                // Turn the fan on for wdata.fan_sec number of seconds and then turn it off
+                relays &= ~PIN_FAN; // Make sure the fan is on
+                wdata.fan_sec--; // and keep it on for that many seconds
+                m_fan_counter = 1; // Re-run this sequence every second for this mode
+            }
         }
     }
 
@@ -115,18 +122,25 @@ void CControl::tick()
     }
 }
 
-void CControl::set_fan_mode(uint8_t mode)
+void CControl::set_fan_mode(uint8_t mode, bool by_button)
 {
     if (mode > FAN_MODE_LAST)
         mode = FAN_MODE_OFF;
+
+    // For all modes except the TIMED mode, clear the TIMED mode fan off counter
+    if (mode != FAN_MODE_TIMED)
+        wdata.fan_sec = 0;
 
     // Set the new value into an NV variable
     pref_set("fan_mode", mode);
 
     // Display the current fan mode on the LCD
-    xI2CMessage xMessage;
-    xMessage.xMessageType = I2C_PRINT_FAN;
-    xQueueSend(xI2CQueue, &xMessage, portMAX_DELAY);
+    if (by_button)
+    {
+        xI2CMessage xMessage;
+        xMessage.xMessageType = I2C_PRINT_FAN;
+        xQueueSend(xI2CQueue, &xMessage, portMAX_DELAY);
+    }
 
     // Initiate fan change
     m_fan_counter = 5; // 5 sec to fan change
@@ -134,7 +148,7 @@ void CControl::set_fan_mode(uint8_t mode)
     wdata.fan_mode = mode;
 }
 
-void CControl::set_ac_mode(uint8_t mode)
+void CControl::set_ac_mode(uint8_t mode, bool by_button)
 {
     if (mode > AC_MODE_LAST)
         mode = AC_MODE_OFF;
@@ -143,9 +157,20 @@ void CControl::set_ac_mode(uint8_t mode)
     pref_set("ac_mode", mode);
 
     // Display the current A/C mode on the LCD
-    xI2CMessage xMessage;
-    xMessage.xMessageType = I2C_PRINT_AC;
-    xQueueSend(xI2CQueue, &xMessage, portMAX_DELAY);
+    if (by_button)
+    {
+        xI2CMessage xMessage;
+        xMessage.xMessageType = I2C_PRINT_AC;
+        xQueueSend(xI2CQueue, &xMessage, portMAX_DELAY);
+    }
+    else // If the request came from a web client, clear the options and print the target temperature
+    {
+        wdata.option = OPTION_OFF;
+
+        xI2CMessage xMessage;
+        xMessage.xMessageType = I2C_PRINT_OPTIONS;
+        xQueueSend(xI2CQueue, &xMessage, portMAX_DELAY);
+    }
 
     // Initiate A/C change
     m_ac_counter = 30; // 30 sec to A/C mode change
