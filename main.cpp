@@ -269,7 +269,6 @@ static void vTask_1s_tick(void *p)
             {
                 wdata.option = OPTION_OFF;
 
-                // Display the current options on the LCD
                 xI2CMessage xMessage;
                 xMessage.xMessageType = I2C_PRINT_STATUS;
                 xQueueSend(xI2CQueue, &xMessage, portMAX_DELAY);

@@ -206,6 +206,10 @@ void handleSet(AsyncWebServerRequest *request)
             control.set_cool_to(u8);
         else if (request->arg("heat_to").length())
             control.set_heat_to(u8);
+
+        xI2CMessage xMessage;
+        xMessage.xMessageType = I2C_PRINT_STATUS;
+        xQueueSend(xI2CQueue, &xMessage, portMAX_DELAY);
     }
 }
 
