@@ -9,9 +9,6 @@
 // https://github.com/me-no-dev/ESPAsyncWebServer
 // https://github.com/me-no-dev/AsyncTCP
 
-// Two variations of web response functions: one using String class and the other one using sprintf()
-#define USE_SPRINTF 1
-
 extern "C" uint8_t temprature_sens_read(); // Very imprecise internal ESP32 temperature value in F
 
 #include "wifi_credentials.h"
@@ -20,18 +17,12 @@ extern "C" uint8_t temprature_sens_read(); // Very imprecise internal ESP32 temp
 // #define MY_PASS "your-password"
 static const char* ssid = MY_SSID;
 static const char* password = MY_PASS;
-#if USE_SPRINTF
 static char webtext_root[1024];
 static char webtext_json[1024];
-#else // USE_SPRINTF
-static String webtext_root; // Web response to / (root)
-static String webtext_json; // Web response to /json
-#endif // USE_SPRINTF
 static uint32_t reconnects = 0; // Count how many times WiFi had to reconnect (for stats)
 
 AsyncWebServer server(80);
 
-#if USE_SPRINTF
 static char *get_time_str(uint32_t sec, bool also_days)
 {
     static char buf[32];
@@ -131,93 +122,6 @@ void get_webserver_response_json()
     if (webtext_json[sizeof(webtext_json) - 1] != 0xFF)
         wdata.status |= STATUS_BUF_OVERFLOW;
 }
-
-#else // USE_SPRINTF
-
-String get_time_str(uint32_t sec, bool also_days)
-{
-    uint32_t seconds = (sec % 60);
-    uint32_t minutes = (sec % 3600) / 60;
-    uint32_t hours = (sec % 86400) / 3600;
-    uint32_t days = (sec % (86400 * 30)) / 86400;
-    if (also_days)
-        return String(days) + ":" + String(hours) + ":" + String(minutes) + ":" + String(seconds);
-    return String(hours) + ":" + String(minutes) + ":" + String(seconds);
-}
-
-void get_webserver_response_html()
-{
-    // Make this web page auto-refresh every 5 sec
-    webtext_root = "<!DOCTYPE html><html><head><meta http-equiv=\"refresh\" content=\"5\"></head><body><pre>";
-    webtext_root += "\nVER = " + String(FIRMWARE_VERSION);
-    webtext_root += "\nID = " + wdata.id;
-    webtext_root += "\nTAG = " + wdata.tag;
-    webtext_root += "\nstatus = " + String(wdata.status);
-    webtext_root += "\nuptime = " + get_time_str(wdata.seconds, true);
-    webtext_root += "\nreconnects = " + String(reconnects);
-    webtext_root += "\nRSSI = " + String(WiFi.RSSI()); // Signal strength
-    webtext_root += "\nGPIO23 = " + String(wdata.gpio23);
-    webtext_root += "\nINT_C = " + String((temprature_sens_read() - 32) / 1.8);
-    webtext_root += "\ntemp_valid = " + String(wdata.temp_valid);
-    webtext_root += "\ntemp_c = " + String(wdata.temp_c);
-    webtext_root += "\ntemp_f = " + String(wdata.temp_f);
-    webtext_root += "\next_server = " + wdata.ext_server;
-    webtext_root += "\next_read_sec = " + String(wdata.ext_read_sec);
-    webtext_root += "\next_valid = " + String(wdata.ext_valid);
-    webtext_root += "\next_temp_c = " + String(wdata.ext_temp_c);
-    webtext_root += "\next_temp_f = " + String(wdata.ext_temp_f);
-    webtext_root += "\nrelays = " + String(wdata.relays);
-    webtext_root += "\nfan_on = " + String(!!(~wdata.relays & PIN_FAN));
-    webtext_root += "\ncool_on = " + String(!!(~wdata.relays & PIN_COOL));
-    webtext_root += "\nheat_on = " + String(!!(~wdata.relays & PIN_HEAT));
-    webtext_root += "\nmaster_on = " + String(!!(~wdata.relays & PIN_MASTER));
-    webtext_root += "\nfan_mode = " + String(wdata.fan_mode);
-    webtext_root += "\nac_mode = " + String(wdata.ac_mode);
-    webtext_root += "\ncool_to = " + String(wdata.cool_to);
-    webtext_root += "\nheat_to = " + String(wdata.heat_to);
-    webtext_root += "\nhyst_trigger = " + String(wdata.hyst_trigger);
-    webtext_root += "\nhyst_release = " + String(wdata.hyst_release);
-    webtext_root += "\nfilter_sec = " + String(wdata.filter_sec);
-    webtext_root += "\ncool_sec = " + String(wdata.cool_sec);
-    webtext_root += "\nheat_sec = " + String(wdata.heat_sec);
-    webtext_root += "\nfilter_hms = " + get_time_str(wdata.filter_sec, false);
-    webtext_root += "\ncool_hms = " + get_time_str(wdata.cool_sec, false);
-    webtext_root += "\nheat_hms = " + get_time_str(wdata.heat_sec, false);
-    webtext_root += "\nstack_watermarks = " +
-        String(wdata.task_1s) + "," + String(wdata.task_i2c) + "," + String(wdata.task_control) + "," + String(wdata.task_gpio) + "," + String(wdata.task_ext);
-    webtext_root += "</pre></body></html>\n";
-}
-
-void get_webserver_response_json()
-{
-    webtext_json = "{";
-    webtext_json += " \"id\":\"" + wdata.id + "\"";
-    webtext_json += ", \"tag\":\"" + wdata.tag + "\"";
-    webtext_json += ", \"uptime\":" + String(wdata.seconds);
-    webtext_json += ", \"status\":" + String(wdata.status);
-    // Json returns only the effective temperature (internal or external sensor)
-    webtext_json += ", \"temp_valid\":" + String(wdata.get_temp_valid());
-    if (wdata.get_temp_valid()) // Add the temperature valid only if it is valid
-    {
-        webtext_json += ", \"temp_c\":" + String(wdata.get_temp_c());
-        webtext_json += ", \"temp_f\":" + String(wdata.get_temp_f());
-    }
-    webtext_json += ", \"relays\":" + String(wdata.relays);
-    webtext_json += ", \"fan_on\":" + String(!!(~wdata.relays & PIN_FAN));
-    webtext_json += ", \"cool_on\":" + String(!!(~wdata.relays & PIN_COOL));
-    webtext_json += ", \"heat_on\":" + String(!!(~wdata.relays & PIN_HEAT));
-    webtext_json += ", \"master_on\":" + String(!!(~wdata.relays & PIN_MASTER));
-    webtext_json += ", \"fan_mode\":" + String(wdata.fan_mode);
-    webtext_json += ", \"ac_mode\":" + String(wdata.ac_mode);
-    webtext_json += ", \"cool_to\":" + String(wdata.cool_to);
-    webtext_json += ", \"heat_to\":" + String(wdata.heat_to);
-    webtext_json += ", \"filter_sec\":" + String(wdata.filter_sec);
-    webtext_json += ", \"cool_sec\":" + String(wdata.cool_sec);
-    webtext_json += ", \"heat_sec\":" + String(wdata.heat_sec);
-    webtext_json += " }";
-}
-
-#endif // USE_SPRINTF
 
 void handleRoot(AsyncWebServerRequest *request)
 {
